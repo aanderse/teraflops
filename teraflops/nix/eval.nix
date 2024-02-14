@@ -45,10 +45,14 @@ let
     config = {
       _module.freeformType = with types; attrsOf deferredModule;
 
-      defaults = { lib, ... }: with lib; {
+      defaults = { name, lib, ... }: with lib; {
         options.deployment.targetEnv = mkOption {
           type = with types; nullOr str;
           default = null;
+        };
+
+        config = {
+          networking.hostName = mkDefault name;
         };
       };
 
