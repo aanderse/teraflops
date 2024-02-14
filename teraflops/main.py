@@ -1,0 +1,654 @@
+#!/usr/bin/env python3
+
+import argparse
+import contextlib
+import json
+import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+from termcolor import colored
+
+class ColmenaFormatter(logging.Formatter):
+  _prefix = {
+      logging.FATAL: colored('FATAL', color='red', attrs=['bold']),
+      logging.ERROR: 'ERROR',
+      logging.WARNING: colored('WARN ', color='yellow'),
+      logging.INFO: colored('INFO ', color='green'),
+      logging.DEBUG: 'DEBUG',
+      logging.NOTSET: '',
+  }
+
+  def format(self, record):
+    return '[' + self._prefix[record.levelno] + '] ' + super().format(record)
+
+# adapted from https://github.com/zhaofengli/colmena/blob/main/src/nix/node_filter.rs
+class NodeFilter:
+  def __init__(self, filter_str):
+    trimmed = filter_str.strip()
+    if not trimmed:
+      logging.warning(f'Filter "{filter_str}" is blank and will match nothing')
+      self.rules = []
+      return
+
+    self.rules = [
+      Rule(pattern.strip('@') if pattern.startswith('@') else pattern)
+      for pattern in trimmed.split(',')
+    ]
+
+  def filter(self, nodes):
+    if not self.rules:
+      return dict()
+
+    result = dict()
+    for name, node in nodes.items():
+      for rule in self.rules:
+        if rule.matches_name(name):
+          result[name] = node
+        elif rule.matches_tag(node['tags']):
+          result[name] = node
+
+    return result
+
+class Rule:
+  def __init__(self, pattern):
+    self.pattern = pattern
+
+  def matches_name(self, name):
+    return re.match(self.pattern, name) is not None
+
+  def matches_tag(self, tags):
+    return any(re.match(self.pattern, tag) for tag in tags)
+
+EVAL_NIX = """
+{ flake ? builtins.getFlake (toString "%s") }:
+let
+  lib = flake.inputs.nixpkgs.lib;
+  jsonType = with lib.types; let
+    valueType = nullOr (oneOf [
+      bool
+      int
+      float
+      str
+      path
+      (attrsOf valueType)
+      (listOf valueType)
+    ]) // {
+      description = "JSON value";
+    };
+  in valueType;
+
+  resources =
+    let
+      value = with builtins; lib.optionalAttrs (pathExists ./resources.json) (fromJSON (readFile ./resources.json));
+      eval = address:
+        if builtins.pathExists ./resources.json then
+          lib.getAttrFromPath (lib.splitString "." address) value
+        else
+          "\\${${address}}"
+      ;
+    in
+      value // { inherit eval; };
+
+  module = { options, config, lib, ... }: with lib; {
+    options = {
+      meta = mkOption {
+        type = with types; attrsOf unspecified;
+        default = { };
+      };
+    } // genAttrs [ "check" "data" "locals" "module" "output" "provider" "removed" "resource" "run" "terraform" "variable" ] (value: mkOption {
+      type = lib.types.deferredModuleWith {
+        staticModules = [
+          { _module.freeformType = jsonType; }
+        ];
+      };
+      default = {};
+    });
+
+    config = {
+      _module.freeformType = with types; attrsOf deferredModule;
+
+      defaults = { lib, ... }: with lib; {
+        options.deployment.targetEnv = mkOption {
+          type = with types; nullOr str;
+          default = null;
+        };
+      };
+
+      output = { nodes, lib, ... }: with lib; {
+        teraflops = {
+          sensitive = true;
+          value = {
+            version = 1;
+            nodes = mapAttrs (_: node: { inherit (node.config.deployment) tags targetHost targetPort targetUser; }) nodes;
+          };
+        };
+      };
+    };
+  };
+
+  eval = lib.evalModules {
+    modules = [
+      module
+      {
+        _module.args.tf.mkAlias = alias: attrs: { __aliases = { "${alias}" = attrs; }; };
+      }
+      {
+        _file = "${flake.outPath}/flake.nix";
+        imports = [ flake.outputs.teraflops ];
+      }
+    ];
+
+    specialArgs = { inherit resources; };
+  };
+in
+  eval
+"""
+
+HIVE_NIX = """
+let
+  eval = import ./eval.nix { };
+in
+  with builtins; removeAttrs eval.config (attrNames eval.options) // { inherit (eval.config) meta; }
+"""
+
+# support terraform provider aliases via mkAlias
+#
+# provider.aws = tf.mkAlias "west" {
+#   region = "eu-west-2";
+# };
+#
+TERRAFORM_NIX = """
+{ nodes, pkgs, lib, ... }: with lib;
+let
+  eval = import ./eval.nix { };
+  value = filterAttrs (_: v: v != null && v != { })
+    (mapAttrs (_: value: (evalModules {
+      modules = [ value ];
+      specialArgs = { inherit nodes pkgs lib; };
+    }).config) {
+      inherit (eval.config)
+        check
+        data
+        locals
+        module
+        output
+        provider
+        removed
+        resource
+        run
+        terraform
+        variable
+      ;
+    });
+in
+  value // optionalAttrs (value ? provider) {
+    provider = flatten (mapAttrsToList (name: attrs: [ { "${name}" = builtins.removeAttrs attrs ["__aliases"]; } ] ++ (mapAttrsToList (k: v: { "${k}" = v; }) (attrs.__aliases or { }))) value.provider);
+  }
+"""
+
+class App:
+  def __init__(self, tempdir):
+    self.tempdir = tempdir
+
+  def generate_resources_json(self):
+    self.generate_main_tf_json(refresh=False)
+
+    process = subprocess.run(['terraform', 'show', '-json'], stdout=subprocess.PIPE, check=True)
+    output = json.loads(process.stdout)
+
+    try:
+      resources = output['values']['root_module']['resources']
+    except KeyError:
+      resources = []
+
+    nix_data = dict()
+    for resource in resources:
+      # TODO: handle terraform
+      # - [x] for_each
+      # - [ ] count
+      # - [ ] etc...
+      inner = nix_data.setdefault(resource['type'], dict())
+
+      if resource.get('index'):
+        index = inner.setdefault(resource['name'], dict())
+        index[resource['index']] = resource['values']
+      else:
+        inner[resource['name']] = resource['values']
+
+    with open(os.path.join(self.tempdir, 'resources.json'), 'w') as f:
+      f.write(json.dumps(nix_data, indent=2, sort_keys=True))
+
+    return os.path.join(self.tempdir, 'resources.json')
+
+  def generate_eval_nix(self):
+    process = subprocess.run(['nix', '--extra-experimental-features', 'nix-command', 'flake', 'metadata', '--json', self.config], stdout=subprocess.PIPE, check=True)
+    metadata = json.loads(process.stdout)
+
+    flake = metadata['resolvedUrl']
+
+    with open(os.path.join(self.tempdir, 'eval.nix'), 'w') as f:
+      f.write(EVAL_NIX % flake)
+
+  def generate_hive_nix(self, full_eval: bool):
+    if full_eval:
+      self.generate_resources_json()
+
+    with open(os.path.join(self.tempdir, 'hive.nix'), 'w') as f:
+      f.write(HIVE_NIX)
+    
+    return os.path.join(self.tempdir, 'hive.nix')
+
+  def generate_terraform_nix(self):
+    with open(os.path.join(self.tempdir, 'terraform.nix'), 'w') as f:
+      f.write(TERRAFORM_NIX)
+
+    return os.path.join(self.tempdir, 'terraform.nix')
+
+  # NOTE: only cache/use cached main.tf.json if no --config is specified
+  def generate_main_tf_json(self, refresh: bool):
+    terraform_cache_file = os.path.join(os.getenv('TF_DATA_DIR', '.terraform'), 'teraflops.json')
+
+    if not refresh and self.config == '.' and os.path.isfile(terraform_cache_file):
+      shutil.copy(terraform_cache_file, 'main.tf.json')
+      return
+
+    with open('main.tf.json', 'w') as f:
+      cmd = ['colmena']
+      if self.show_trace:
+        cmd += ['--show-trace']
+      cmd += ['--config', self.generate_hive_nix(full_eval=False), 'eval', self.generate_terraform_nix()]
+      process = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
+      json_object = json.loads(process.stdout)
+      json.dump(json_object, f, indent=2)
+
+    if self.config == '.':
+      shutil.copy('main.tf.json', terraform_cache_file)
+
+  def query_deployment(self):
+    self.generate_main_tf_json(refresh=False)
+
+    process = subprocess.run(['terraform', 'output', '-json', 'teraflops'], capture_output=True)
+
+    try:
+      output = json.loads(process.stdout)
+
+      if 'nodes' in output:
+          return output['nodes']
+    except:
+      pass
+
+    process = subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval', '-E', '{ nodes, pkgs, lib }: lib.mapAttrs (_: node: { inherit (node.config.deployment) tags targetHost targetPort targetUser; }) nodes'], stdout=subprocess.PIPE, check=True)
+    data = json.loads(process.stdout)
+
+    return data
+
+  def tf(self, args):
+    # needs: main.tf.json (needs: eval.nix, hive.nix, terraform.nix)
+
+    self.generate_main_tf_json(refresh=True)
+    subprocess.run(['terraform'] + args.passthru, check=True)
+
+  def nix(self, args):
+    if '--config' in args.passthru:
+      logging.fatal('cannot pass through --config argument to colmena')
+      sys.exit(1)
+
+    # needs: eval.nix, hive.nix, resources.json (needs: main.tf.json, eval.nix, hive.nix, terraform.nix)
+    subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True)] + args.passthru, check=True)
+
+  def init(self, args):
+    self.generate_main_tf_json(refresh=True)
+    subprocess.run(['terraform', 'init'], check=True)
+
+  def repl(self, args):
+    # TODO: add `resources` argument to `teraflops repl`
+    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'repl']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    subprocess.run(cmd, check=True)
+
+  def eval(self, args):
+    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    cmd += ['-E', 'let resources = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f { inherit resources nodes pkgs lib; }' % (os.path.join(self.tempdir, 'resources.json'), args.expr)]
+    subprocess.run(cmd, check=True)
+
+  def eval_jobs(self, args):
+    cmd = ['nix-eval-jobs', '--max-memory-size', '12000', '--workers', '12']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    cmd += ['--expr']
+    cmd += ["""
+    let
+      colmena = builtins.getFlake "github:zhaofengli/colmena";
+      eval = colmena.outputs.lib.makeHive (import %s);
+
+      resources = with builtins; fromJSON (readFile %s);
+      f = %s;
+    in
+      eval.introspect ({ nodes, pkgs, lib }: f { inherit resources nodes pkgs lib; })
+    """ % (self.generate_hive_nix(full_eval=True), os.path.join(self.tempdir, 'resources.json'), args.expr)]
+
+    subprocess.run(cmd, check=True)
+
+  def deploy(self, args):
+    self.create(args)
+    self.activate(args)    
+
+  def plan(self, args):
+    self.generate_main_tf_json(refresh=True)
+    subprocess.run(['terraform', 'plan'], check=True)
+
+  def create(self, args):
+    self.generate_main_tf_json(refresh=True)
+    subprocess.run(['terraform', 'apply'], check=True) #check=False)
+
+  def build(self, args):
+    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    if args.on:
+      cmd += ['--on', args.on]
+    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'build']
+    subprocess.run(cmd, check=True)
+
+  def push(self, args):
+    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    if args.on:
+      cmd += ['--on', args.on]
+    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'push']
+    subprocess.run(cmd, check=True)
+
+  def activate(self, args):
+    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    if args.on:
+      cmd += ['--on', args.on]
+    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'switch']
+    subprocess.run(cmd, check=True)
+
+  def destroy(self, args):
+    self.generate_main_tf_json(refresh=True)
+    subprocess.run(['terraform', 'apply', '-destroy'], check=True)
+
+  def info(self, args):
+    with open(self.generate_resources_json(), 'r') as f:
+     print(f.read())
+
+  def ssh(self, args):
+    nodes = self.query_deployment()
+    node = nodes[args.node]
+
+    cmd = ['ssh']
+
+    if os.environ.get('SSH_CONFIG_FILE'):
+      cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
+
+    if node.get('targetPort'):
+      cmd += ['-p', node['targetPort']]
+
+    if node.get('targetUser'):
+      cmd += ['-l', node.get('targetUser')]
+
+    cmd += [node['targetHost']]
+
+    subprocess.run(cmd, check=True)
+
+  def ssh_for_each(self, args):
+    nodes = self.query_deployment()
+    count = len(nodes)
+
+    if not (args.on is None):
+      node_filter = NodeFilter(args.on)
+      nodes = node_filter.filter(nodes)
+
+    logging.info('Enumerating nodes..')
+
+    if nodes:
+      logging.info(f'Selected {len(nodes)} out of {count} hosts.')
+    else:
+      logging.warning('No hosts selected (0 skipped).')
+
+    processes = dict()
+    for name, data in nodes.items():
+      cmd = ['ssh']
+
+      if os.environ.get('SSH_CONFIG_FILE'):
+        cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
+
+      if data.get('targetPort'):
+        cmd += ['-p', data['targetPort']]
+
+      if data.get('targetUser'):
+        cmd += ['-l', data.get('targetUser')]
+
+      cmd += [data['targetHost']]
+      cmd += args.command
+
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
+
+      processes[name] = process
+
+    length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
+
+    for name, process in processes.items():
+      rc = process.wait()
+
+      while True:
+        line = process.stdout.readline()
+        if line:
+          print(colored(name.ljust(length), attrs=['bold']), '|', line.rstrip())
+        else:
+          break
+
+      if rc != 0:
+        print(colored(name.ljust(length), color='red', attrs=['bold']), '|', colored('Failed: %s' % process.stderr.readline().rstrip(), color='red'))
+      else:
+        print(colored(name.ljust(length), color='green', attrs=['bold']), '|', colored('Succeeded', color='green'))
+
+    print(''.ljust(length), '|', colored('All done!', color='green'))
+
+  def scp(self, args):
+    nodes = self.query_deployment()
+
+    cmd = ['scp']
+
+    if args.r:
+      cmd += ['-r']
+
+    if os.environ.get('SSH_CONFIG_FILE'):
+      cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
+
+    source = args.source
+    target = args.target
+
+    if ':' in args.source:
+      source_machine, _, source_path = args.source.partition(':')
+
+      node = nodes[source_machine]
+
+      if node.get('targetPort'):
+        cmd += ['-P', node['targetPort']]
+
+      source = ''
+      if node.get('targetUser'):
+        source += node.get('targetUser')
+        source += '@'
+      if ':' in node['targetHost']:
+        source += '['
+        source += node['targetHost']
+        source += ']'
+      else:
+        source += node['targetHost']
+      source += ':'
+      source += source_path
+
+    if ':' in args.target:
+      target_machine, _, target_path = args.target.partition(':')
+
+      node = nodes[target_machine]
+
+      if node.get('targetPort'):
+        cmd += ['-P', node['targetPort']]
+
+      target = ''
+      if node.get('targetUser'):
+        target += node.get('targetUser')
+        target += '@'
+      if ':' in node['targetHost']:
+        target += '['
+        target += node['targetHost']
+        target += ']'
+      else:
+        target += node['targetHost']
+      target += ':'
+      target += target_path
+
+    cmd += [source, target]
+
+    subprocess.run(cmd, check=True)
+
+  def reboot(self, args):
+    logging.fatal('not yet implemented')
+    sys.exit(1)
+
+  def run(self):
+    parser = argparse.ArgumentParser(description='a terraform ops tool which is sure to be a flop')
+    parser.add_argument('-f', '--config', default='.', help='...')
+    parser.add_argument('--show-trace', action='store_true', help='passes --show-trace to nix commands')
+    parser.add_argument('-q', '--quiet', action='store_true')
+
+    on_parser = argparse.ArgumentParser(add_help=False)
+    on_parser.add_argument('--on', metavar='<NODES>', help='select a list of nodes to deploy to')
+
+    subparsers = parser.add_subparsers(title='subcommands') #, dest='subcommand')
+
+    # subparser for the 'init' command
+    init_parser = subparsers.add_parser('init', help='prepare your working directory for other commands')
+    init_parser.set_defaults(func=self.init)
+
+    # subparser for the 'repl' command
+    repl_parser = subparsers.add_parser('repl', help='start an interactive REPL with the complete configuration')
+    repl_parser.set_defaults(func=self.repl)
+
+    # subparser for the 'eval' command
+    eval_parser = subparsers.add_parser('eval', help='')
+    eval_parser.set_defaults(func=self.eval)
+    eval_parser.add_argument('expsourcer', type=str, help='evaluate an expression using the complete configuration')
+
+    # TODO: drop this
+    # subparser for the 'eval_jobs' command
+    eval_jobs_parser = subparsers.add_parser('eval-jobs')
+    eval_jobs_parser.set_defaults(func=self.eval_jobs)
+    eval_jobs_parser.add_argument('expr', type=str)
+
+    # subparser for the 'deploy' command
+    deploy_parser = subparsers.add_parser('deploy', help='deploy the configuration')
+    deploy_parser.set_defaults(func=self.deploy)
+
+    # subparser for the 'plan' command
+    plan_parser = subparsers.add_parser('plan', help='show changes required by the current configuration')
+    plan_parser.set_defaults(func=self.plan)
+
+    # subparser for the 'create' command
+    create_parser = subparsers.add_parser('create', help='create or update all resources in the deployment')
+    create_parser.set_defaults(func=self.create)
+
+    # subparser for the 'build' command
+    build_parser = subparsers.add_parser('build', parents=[on_parser], help='build the system profiles')
+    build_parser.set_defaults(func=self.build)
+
+    # subparser for the 'push' command
+    push_parser = subparsers.add_parser('push', parents=[on_parser], help='copy the closures to remote nodes')
+    push_parser.set_defaults(func=self.push)
+
+    # subparser for the 'activate' command
+    activate_parser = subparsers.add_parser('activate', parents=[on_parser], help='apply configurations on remote nodes')
+    activate_parser.set_defaults(func=self.activate)
+
+    # subparser for the 'destroy' command
+    destroy_parser = subparsers.add_parser('destroy', help='destroy all resources in the deployment')
+    destroy_parser.set_defaults(func=self.destroy)
+
+    # subparser for the 'info' command
+    info_parser = subparsers.add_parser('info', help='show the state of the deployment')
+    info_parser.set_defaults(func=self.info)
+
+    # subparser for the 'ssh' command
+    ssh_parser = subparsers.add_parser('ssh', help='login on the specified machine via SSH')
+    ssh_parser.set_defaults(func=self.ssh)
+    ssh_parser.add_argument('node', type=str, help='identifier of the node')
+
+    # subparser for the 'ssh_for_each' command
+    ssh_for_each_parser = subparsers.add_parser('ssh-for-each', parents=[on_parser], help='execute a command on each machine via SSH')
+    ssh_for_each_parser.set_defaults(func=self.ssh_for_each)
+    ssh_for_each_parser.add_argument('command', nargs=argparse.REMAINDER, help='command to run')
+
+    # subparser for the 'scp' command
+    scp_parser = subparsers.add_parser('scp', help='copy files to or from the specified machine via scp')
+    scp_parser.set_defaults(func=self.scp)
+    scp_parser.add_argument('-r', action='store_true', help='recursively copy entire directories')
+    scp_parser.add_argument('source', type=str, help='source file location')
+    scp_parser.add_argument('target', type=str, help='destination file location')
+
+    reboot_parser = subparsers.add_parser('reboot', parents=[on_parser], help='reboot all nodes in the deployment')
+    reboot_parser.set_defaults(func=self.reboot)
+    reboot_parser.add_argument('--no-wait', action='store_true', help='do not wait until the nodes are up again')
+
+
+    # TODO: different subparser
+
+    # subparser for the 'tf' command
+    tf_parser = subparsers.add_parser('tf', help='low level terraform commands')
+    tf_parser.set_defaults(func=self.tf)
+    tf_parser.add_argument('passthru', nargs=argparse.REMAINDER)
+
+    # subparser for the 'nix' command
+    nix_parser = subparsers.add_parser('nix', help='low level colmena commands')
+    nix_parser.set_defaults(func=self.nix)
+    nix_parser.add_argument('passthru', nargs=argparse.REMAINDER)
+
+
+    # parse the command-line arguments
+    args = parser.parse_args()
+
+    # call the appropriate function based on the subcommand
+    if hasattr(args, 'func'):
+      try:
+        self.config = args.config
+        self.show_trace = args.show_trace
+
+        self.generate_eval_nix()
+
+        args.func(args)
+      except subprocess.CalledProcessError as e:
+        sys.exit(e.returncode)
+      finally:
+        with contextlib.suppress(FileNotFoundError):
+          os.remove('main.tf.json')
+    else:
+      # if no subcommand is provided, print help
+      parser.print_help()
+
+def main():
+  handler = logging.StreamHandler()
+  handler.setFormatter(ColmenaFormatter('%(message)s'))
+
+  logging.getLogger().addHandler(handler)
+  logging.getLogger().setLevel(logging.INFO) # TODO: observe RUST_LOG environment variable, --verbose + --quiet
+
+  with tempfile.TemporaryDirectory(prefix='teraflops.', delete=True) as tempdir:
+    app = App(tempdir)
+    app.run()
+
+if __name__ == '__main__':
+  main()
