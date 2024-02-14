@@ -422,7 +422,7 @@ class App:
     # subparser for the 'eval' command
     eval_parser = subparsers.add_parser('eval', help='')
     eval_parser.set_defaults(func=self.eval)
-    eval_parser.add_argument('expsourcer', type=str, help='evaluate an expression using the complete configuration')
+    eval_parser.add_argument('expr', type=str, help='evaluate an expression using the complete configuration')
 
     # TODO: drop this
     # subparser for the 'eval_jobs' command
