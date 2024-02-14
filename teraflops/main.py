@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 
+from importlib.resources import files
 from termcolor import colored
 
 class ColmenaFormatter(logging.Formatter):
@@ -63,134 +64,6 @@ class Rule:
 
   def matches_tag(self, tags):
     return any(re.match(self.pattern, tag) for tag in tags)
-
-EVAL_NIX = """
-{ flake ? builtins.getFlake (toString "%s") }:
-let
-  lib = flake.inputs.nixpkgs.lib;
-  jsonType = with lib.types; let
-    valueType = nullOr (oneOf [
-      bool
-      int
-      float
-      str
-      path
-      (attrsOf valueType)
-      (listOf valueType)
-    ]) // {
-      description = "JSON value";
-    };
-  in valueType;
-
-  resources =
-    let
-      value = with builtins; lib.optionalAttrs (pathExists ./resources.json) (fromJSON (readFile ./resources.json));
-      eval = address:
-        if builtins.pathExists ./resources.json then
-          lib.getAttrFromPath (lib.splitString "." address) value
-        else
-          "\\${${address}}"
-      ;
-    in
-      value // { inherit eval; };
-
-  module = { options, config, lib, ... }: with lib; {
-    options = {
-      meta = mkOption {
-        type = with types; attrsOf unspecified;
-        default = { };
-      };
-    } // genAttrs [ "check" "data" "locals" "module" "output" "provider" "removed" "resource" "run" "terraform" "variable" ] (value: mkOption {
-      type = lib.types.deferredModuleWith {
-        staticModules = [
-          { _module.freeformType = jsonType; }
-        ];
-      };
-      default = {};
-    });
-
-    config = {
-      _module.freeformType = with types; attrsOf deferredModule;
-
-      defaults = { lib, ... }: with lib; {
-        options.deployment.targetEnv = mkOption {
-          type = with types; nullOr str;
-          default = null;
-        };
-      };
-
-      output = { nodes, lib, ... }: with lib; {
-        teraflops = {
-          sensitive = true;
-          value = {
-            version = 1;
-            nodes = mapAttrs (_: node: { inherit (node.config.deployment) tags targetHost targetPort targetUser; }) nodes;
-          };
-        };
-      };
-    };
-  };
-
-  eval = lib.evalModules {
-    modules = [
-      module
-      {
-        _module.args.tf.mkAlias = alias: attrs: { __aliases = { "${alias}" = attrs; }; };
-      }
-      {
-        _file = "${flake.outPath}/flake.nix";
-        imports = [ flake.outputs.teraflops ];
-      }
-    ];
-
-    specialArgs = { inherit resources; };
-  };
-in
-  eval
-"""
-
-HIVE_NIX = """
-let
-  eval = import ./eval.nix { };
-in
-  with builtins; removeAttrs eval.config (attrNames eval.options) // { inherit (eval.config) meta; }
-"""
-
-# support terraform provider aliases via mkAlias
-#
-# provider.aws = tf.mkAlias "west" {
-#   region = "eu-west-2";
-# };
-#
-TERRAFORM_NIX = """
-{ nodes, pkgs, lib, ... }: with lib;
-let
-  eval = import ./eval.nix { };
-  value = filterAttrs (_: v: v != null && v != { })
-    (mapAttrs (_: value: (evalModules {
-      modules = [ value ];
-      specialArgs = { inherit nodes pkgs lib; };
-    }).config) {
-      inherit (eval.config)
-        check
-        data
-        locals
-        module
-        output
-        provider
-        removed
-        resource
-        run
-        terraform
-        variable
-      ;
-    });
-in
-  value // optionalAttrs (value ? provider) {
-    provider = flatten (mapAttrsToList (name: attrs: [ { "${name}" = builtins.removeAttrs attrs ["__aliases"]; } ] ++ (mapAttrsToList (k: v: { "${k}" = v; }) (attrs.__aliases or { }))) value.provider);
-  }
-"""
-
 class App:
   def __init__(self, tempdir):
     self.tempdir = tempdir
@@ -231,21 +104,27 @@ class App:
 
     flake = metadata['resolvedUrl']
 
+    eval_nix = files('teraflops.nix').joinpath('eval.nix').read_text()
+
     with open(os.path.join(self.tempdir, 'eval.nix'), 'w') as f:
-      f.write(EVAL_NIX % flake)
+      f.write(eval_nix % flake)
 
   def generate_hive_nix(self, full_eval: bool):
     if full_eval:
       self.generate_resources_json()
 
+    hive_nix = files('teraflops.nix').joinpath('hive.nix').read_text()
+
     with open(os.path.join(self.tempdir, 'hive.nix'), 'w') as f:
-      f.write(HIVE_NIX)
+      f.write(hive_nix)
     
     return os.path.join(self.tempdir, 'hive.nix')
 
   def generate_terraform_nix(self):
+    terraform_nix = files('teraflops.nix').joinpath('terraform.nix').read_text()
+
     with open(os.path.join(self.tempdir, 'terraform.nix'), 'w') as f:
-      f.write(TERRAFORM_NIX)
+      f.write(terraform_nix)
 
     return os.path.join(self.tempdir, 'terraform.nix')
 
