@@ -1,0 +1,23 @@
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teraflops"
+authors = [
+  {name = "Aaron Andersen", email = "aaron@fosslib.net"}
+]
+description = "A simple 'Hello World' application"
+version = "0.0.1"
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = [
+  "termcolor"
+]
+
+[project.scripts]
+teraflops = "teraflops.main:main"
+
+[tool.setuptools.packages.find]
+include = ["teraflops"]

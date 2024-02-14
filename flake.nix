@@ -10,20 +10,15 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        python' = pkgs.python312.withPackages(p: [ p.termcolor ]);
       in
       {
-        packages.default = pkgs.writers.makeScriptWriter {
-          interpreter = python'.interpreter;
-          check = "";
-        } "/bin/teraflops" ./teraflops/main.py;
+        packages.default = pkgs.python312.pkgs.callPackage ./nix/teraflops.nix {};
 
         devShells.default = with pkgs;
           mkShell {
             pname = "teraflops";
-            packages = [
-              python'
-            ];
+
+            inputsFrom = [ self.packages.${system}.default ];
           };
       }
     );
