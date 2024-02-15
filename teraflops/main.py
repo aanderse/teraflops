@@ -130,10 +130,11 @@ class App:
 
   # NOTE: only cache/use cached main.tf.json if no --config is specified
   def generate_main_tf_json(self, refresh: bool):
-    terraform_cache_file = os.path.join(os.getenv('TF_DATA_DIR', '.terraform'), 'teraflops.json')
+    tf_data_dir = os.getenv('TF_DATA_DIR', '.terraform')
+    tf_cache_file = os.path.join(tf_data_dir, 'teraflops.json')
 
-    if not refresh and self.config == '.' and os.path.isfile(terraform_cache_file):
-      shutil.copy(terraform_cache_file, 'main.tf.json')
+    if not refresh and self.config == '.' and os.path.isfile(tf_cache_file):
+      shutil.copy(tf_cache_file, 'main.tf.json')
       return
 
     with open('main.tf.json', 'w') as f:
@@ -146,7 +147,8 @@ class App:
       json.dump(json_object, f, indent=2)
 
     if self.config == '.':
-      shutil.copy('main.tf.json', terraform_cache_file)
+      os.makedirs(tf_data_dir, exist_ok=True)
+      shutil.copy('main.tf.json', tf_cache_file)
 
   def query_deployment(self):
     self.generate_main_tf_json(refresh=False)
