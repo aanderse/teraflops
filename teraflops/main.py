@@ -272,6 +272,39 @@ class App:
     with open(self.generate_terraform_json(), 'r') as f:
      print(f.read())
 
+  def check(self, args):
+    nodes = self.query_deployment()
+
+    processes = dict()
+    for name, data in nodes.items():
+      cmd = ['ssh']
+
+      if os.environ.get('SSH_CONFIG_FILE'):
+        cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
+
+      if data.get('targetPort'):
+        cmd += ['-p', data['targetPort']]
+
+      if data.get('targetUser'):
+        cmd += ['-l', data.get('targetUser')]
+
+      cmd += [data['targetHost']]
+      cmd += ['uptime']
+
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, encoding='UTF-8')
+
+      processes[name] = process
+
+    length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
+
+    for name, process in processes.items():
+      rc = process.wait()
+
+      if rc != 0:
+        print(colored(name.ljust(length), color='red', attrs=['bold']), '|', colored('unavailable', color='red'))
+      else:
+        print(colored(name.ljust(length), color='green', attrs=['bold']), '|', colored(process.stdout.read().rstrip(), color='green'))
+
   def ssh(self, args):
     nodes = self.query_deployment()
     node = nodes[args.node]
@@ -470,6 +503,10 @@ class App:
     # subparser for the 'info' command
     info_parser = subparsers.add_parser('info', help='show the state of the deployment')
     info_parser.set_defaults(func=self.info)
+
+    # subparser for the 'check' command
+    check_parser = subparsers.add_parser('check', help='attempt to connect to each node via SSH and print the results of the uptime command.')
+    check_parser.set_defaults(func=self.check)
 
     # subparser for the 'ssh' command
     ssh_parser = subparsers.add_parser('ssh', help='login on the specified machine via SSH')
