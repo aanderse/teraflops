@@ -2,10 +2,10 @@
 let
   eval = import ./eval.nix { };
   value = filterAttrs (_: v: v != null && v != { })
-    (mapAttrs (_: value: (evalModules {
+    (mapAttrs (_: value: let x = (evalModules {
       modules = [ value ];
       specialArgs = { inherit nodes pkgs lib; };
-    }).config) {
+    }).config; in filterAttrs (_: v: v != { }) x) {
       inherit (eval.config)
         check
         data
