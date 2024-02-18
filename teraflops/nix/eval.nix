@@ -15,17 +15,26 @@ let
     };
   in valueType;
 
+  terraform =
+    let
+      value = with builtins; lib.optionalAttrs (pathExists ./terraform.json) (fromJSON (readFile ./terraform.json));
+    in
+    {
+      outputs = value.outputs or { };
+      resources = value.resources or { };
+    };
+
+  outputs = terraform.outputs;
   resources =
     let
-      value = with builtins; lib.optionalAttrs (pathExists ./resources.json) (fromJSON (readFile ./resources.json));
       eval = address:
-        if builtins.pathExists ./resources.json then
-          lib.getAttrFromPath (lib.splitString "." address) value
+        if terraform.resources != { } then
+          lib.getAttrFromPath (lib.splitString "." address) terraform.resources
         else
           "\${${address}}"
       ;
     in
-      value // { inherit eval; };
+      terraform.resources // { inherit eval; };
 
   module = { options, config, lib, ... }: with lib; {
     options = {
@@ -61,7 +70,7 @@ let
           sensitive = true;
           value = {
             version = 1;
-            nodes = mapAttrs (_: node: { inherit (node.config.deployment) tags targetHost targetPort targetUser; }) nodes;
+            nodes = mapAttrs (_: node: { inherit (node.config.deployment) tags targetEnv targetHost targetPort targetUser; }) nodes;
           };
         };
       };
@@ -80,7 +89,7 @@ let
       }
     ];
 
-    specialArgs = { inherit resources; };
+    specialArgs = { inherit outputs resources; };
   };
 in
   eval

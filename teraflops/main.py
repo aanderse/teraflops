@@ -68,24 +68,26 @@ class App:
   def __init__(self, tempdir):
     self.tempdir = tempdir
 
-  def generate_resources_json(self):
+  def generate_terraform_json(self):
     self.generate_main_tf_json(refresh=False)
 
     process = subprocess.run(['terraform', 'show', '-json'], stdout=subprocess.PIPE, check=True)
-    output = json.loads(process.stdout)
+    terraform_data = json.loads(process.stdout)
 
     try:
-      resources = output['values']['root_module']['resources']
+      outputs = terraform_data['values']['outputs']
+      resources = terraform_data['values']['root_module']['resources']
     except KeyError:
-      resources = []
+      resources = dict()
+      outputs = dict()
 
-    nix_data = dict()
+    resources_data = dict()
     for resource in resources:
       # TODO: handle terraform
       # - [x] for_each
       # - [ ] count
       # - [ ] etc...
-      inner = nix_data.setdefault(resource['type'], dict())
+      inner = resources_data.setdefault(resource['type'], dict())
 
       if resource.get('index'):
         index = inner.setdefault(resource['name'], dict())
@@ -93,10 +95,14 @@ class App:
       else:
         inner[resource['name']] = resource['values']
 
-    with open(os.path.join(self.tempdir, 'resources.json'), 'w') as f:
-      f.write(json.dumps(nix_data, indent=2, sort_keys=True))
+    outputs_data = dict()
+    for key, value in outputs.items():
+      outputs_data[key] = value['value']
 
-    return os.path.join(self.tempdir, 'resources.json')
+    with open(os.path.join(self.tempdir, 'terraform.json'), 'w') as f:
+      f.write(json.dumps(dict(outputs=outputs_data, resources=resources_data), indent=2, sort_keys=True))
+
+    return os.path.join(self.tempdir, 'terraform.json')
 
   def generate_eval_nix(self):
     process = subprocess.run(['nix', '--extra-experimental-features', 'nix-command', 'flake', 'metadata', '--json', self.config], stdout=subprocess.PIPE, check=True)
@@ -111,7 +117,7 @@ class App:
 
   def generate_hive_nix(self, full_eval: bool):
     if full_eval:
-      self.generate_resources_json()
+      self.generate_terraform_json()
 
     hive_nix = files('teraflops.nix').joinpath('hive.nix').read_text()
 
@@ -179,7 +185,7 @@ class App:
       logging.fatal('cannot pass through --config argument to colmena')
       sys.exit(1)
 
-    # needs: eval.nix, hive.nix, resources.json (needs: main.tf.json, eval.nix, hive.nix, terraform.nix)
+    # needs: eval.nix, hive.nix, terraform.json (needs: main.tf.json, eval.nix, hive.nix, terraform.nix)
     subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True)] + args.passthru, check=True)
 
   def init(self, args):
@@ -197,7 +203,8 @@ class App:
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval']
     if args.show_trace:
       cmd += ['--show-trace']
-    cmd += ['-E', 'let resources = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f { inherit resources nodes pkgs lib; }' % (os.path.join(self.tempdir, 'resources.json'), args.expr)]
+    # TODO: make `terraform` variable inaccessible from within expression
+    cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f { inherit nodes pkgs lib; inherit (terraform) outputs resources; }' % (os.path.join(self.tempdir, 'terraform.json'), args.expr)]
     subprocess.run(cmd, check=True)
 
   def eval_jobs(self, args):
@@ -210,11 +217,11 @@ class App:
       colmena = builtins.getFlake "github:zhaofengli/colmena";
       eval = colmena.outputs.lib.makeHive (import %s);
 
-      resources = with builtins; fromJSON (readFile %s);
+      terraform = with builtins; fromJSON (readFile %s);
       f = %s;
     in
-      eval.introspect ({ nodes, pkgs, lib }: f { inherit resources nodes pkgs lib; })
-    """ % (self.generate_hive_nix(full_eval=True), os.path.join(self.tempdir, 'resources.json'), args.expr)]
+      eval.introspect ({ nodes, pkgs, lib }: f { inherit nodes pkgs lib; inherit (terraform) outputs resources; })
+    """ % (self.generate_hive_nix(full_eval=True), os.path.join(self.tempdir, 'terraform.json'), args.expr)]
 
     subprocess.run(cmd, check=True)
 
@@ -262,7 +269,7 @@ class App:
     subprocess.run(['terraform', 'apply', '-destroy'], check=True)
 
   def info(self, args):
-    with open(self.generate_resources_json(), 'r') as f:
+    with open(self.generate_terraform_json(), 'r') as f:
      print(f.read())
 
   def ssh(self, args):
