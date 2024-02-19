@@ -269,8 +269,9 @@ class App:
     subprocess.run(['terraform', 'apply', '-destroy'], check=True)
 
   def info(self, args):
-    with open(self.generate_terraform_json(), 'r') as f:
-     print(f.read())
+    with open(self.generate_terraform_json(), 'r') as fp:
+     data = json.load(fp)
+     print(json.dumps(data['resources'], indent=2))
 
   def check(self, args):
     nodes = self.query_deployment()
