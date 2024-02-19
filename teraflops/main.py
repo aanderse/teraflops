@@ -226,14 +226,14 @@ class App:
     subprocess.run(cmd, check=True)
 
   def deploy(self, args):
-    self.create(args)
+    self.apply(args)
     self.activate(args)    
 
   def plan(self, args):
     self.generate_main_tf_json(refresh=True)
     subprocess.run(['terraform', 'plan'], check=True)
 
-  def create(self, args):
+  def apply(self, args):
     self.generate_main_tf_json(refresh=True)
     subprocess.run(['terraform', 'apply'], check=True) #check=False)
 
@@ -481,9 +481,9 @@ class App:
     plan_parser = subparsers.add_parser('plan', help='show changes required by the current configuration')
     plan_parser.set_defaults(func=self.plan)
 
-    # subparser for the 'create' command
-    create_parser = subparsers.add_parser('create', help='create or update all resources in the deployment')
-    create_parser.set_defaults(func=self.create)
+    # subparser for the 'apply' command
+    apply_parser = subparsers.add_parser('apply', help='create or update all resources in the deployment')
+    apply_parser.set_defaults(func=self.apply)
 
     # subparser for the 'build' command
     build_parser = subparsers.add_parser('build', parents=[on_parser], help='build the system profiles')
