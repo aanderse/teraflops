@@ -84,15 +84,17 @@ class App:
 
     resources_data = dict()
     for resource in resources:
-      # TODO: handle terraform
-      # - [x] for_each
-      # - [ ] count
-      # - [ ] etc...
       inner = resources_data.setdefault(resource['type'], dict())
 
-      if resource.get('index'):
-        index = inner.setdefault(resource['name'], dict())
-        index[resource['index']] = resource['values']
+      if resource.get('index') is not None:
+        if type(resource.get('index')) == int:
+          offset = int(resource.get('index'))
+          index = inner.setdefault(resource['name'], list())
+          index += [None] * ((offset + 1) - len(index))
+          index.insert(offset, resource['values'])
+        else:
+          index = inner.setdefault(resource['name'], dict())
+          index[resource['index']] = resource['values']
       else:
         inner[resource['name']] = resource['values']
 
