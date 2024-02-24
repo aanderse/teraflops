@@ -34,7 +34,7 @@ let
           "\${${address}}"
       ;
     in
-      terraform.resources // { inherit eval; };
+      terraform.resources // { inherit eval; exists = terraform.resources != { }; };
 
   module = { options, config, lib, ... }: with lib; {
     options = {
