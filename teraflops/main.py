@@ -130,7 +130,7 @@ class App:
     terraform_nix = files('teraflops.nix').joinpath('terraform.nix').read_text()
 
     with open(os.path.join(self.tempdir, 'terraform.nix'), 'w') as f:
-      f.write(terraform_nix)
+      f.write(terraform_nix % files('teraflops.nix').joinpath('colmena'))
 
     return os.path.join(self.tempdir, 'terraform.nix')
 
@@ -143,18 +143,19 @@ class App:
       shutil.copy(tf_cache_file, 'main.tf.json')
       return
 
-    with open('main.tf.json', 'w') as f:
-      cmd = ['colmena']
-      if self.show_trace:
-        cmd += ['--show-trace']
-      cmd += ['--config', self.generate_hive_nix(full_eval=False), 'eval', self.generate_terraform_nix()]
-      process = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
-      json_object = json.loads(process.stdout)
-      json.dump(json_object, f, indent=2)
+    self.generate_hive_nix(full_eval=False)
+
+    cmd = ['nix-build', '--quiet']
+    if self.show_trace:
+      cmd += ['--show-trace']
+    cmd += ['--out-link', 'main.tf.json', self.generate_terraform_nix()]
+
+    subprocess.run(cmd, check=True)
 
     if self.config == '.':
       os.makedirs(tf_data_dir, exist_ok=True)
       shutil.copy('main.tf.json', tf_cache_file)
+      os.chmod(tf_cache_file, 0o664)
 
   def query_deployment(self):
     self.generate_main_tf_json(refresh=False)
