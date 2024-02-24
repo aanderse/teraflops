@@ -278,7 +278,13 @@ class App:
 
     processes = dict()
     for name, data in nodes.items():
-      cmd = ['ssh']
+      cmd = ['ssh',
+        '-o',
+        'StrictHostKeyChecking=accept-new',
+        '-o',
+        'BatchMode=yes',
+        '-T',
+      ]
 
       if os.environ.get('SSH_CONFIG_FILE'):
         cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
@@ -310,7 +316,12 @@ class App:
     nodes = self.query_deployment()
     node = nodes[args.node]
 
-    cmd = ['ssh']
+    cmd = ['ssh',
+      '-o',
+      'StrictHostKeyChecking=accept-new',
+      '-o',
+      'BatchMode=yes',
+    ]
 
     if os.environ.get('SSH_CONFIG_FILE'):
       cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
@@ -342,7 +353,13 @@ class App:
 
     processes = dict()
     for name, data in nodes.items():
-      cmd = ['ssh']
+      cmd = ['ssh',
+        '-o',
+        'StrictHostKeyChecking=accept-new',
+        '-o',
+        'BatchMode=yes',
+        '-T',
+      ]
 
       if os.environ.get('SSH_CONFIG_FILE'):
         cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
