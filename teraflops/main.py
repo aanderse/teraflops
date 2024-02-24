@@ -68,8 +68,9 @@ class App:
   def __init__(self, tempdir):
     self.tempdir = tempdir
 
-  def generate_terraform_json(self):
-    self.generate_main_tf_json(refresh=False)
+  def generate_terraform_json(self, need_tf_file=True):
+    if need_tf_file:
+      self.generate_main_tf_json(refresh=False)
 
     process = subprocess.run(['terraform', 'show', '-json'], stdout=subprocess.PIPE, check=True)
     terraform_data = json.loads(process.stdout)
@@ -227,8 +228,20 @@ class App:
     subprocess.run(cmd, check=True)
 
   def deploy(self, args):
-    self.apply(args)
-    self.activate(args)    
+    # apply
+    self.generate_main_tf_json(refresh=True)
+    subprocess.run(['terraform', 'apply'], check=True)
+
+    self.generate_terraform_json(need_tf_file=False)
+
+    # activate
+    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=False), 'apply']
+    if args.show_trace:
+      cmd += ['--show-trace']
+    if args.on:
+      cmd += ['--on', args.on]
+    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'switch']
+    subprocess.run(cmd, check=True)
 
   def plan(self, args):
     self.generate_main_tf_json(refresh=True)
@@ -492,7 +505,7 @@ class App:
     eval_jobs_parser.add_argument('expr', type=str)
 
     # subparser for the 'deploy' command
-    deploy_parser = subparsers.add_parser('deploy', help='deploy the configuration')
+    deploy_parser = subparsers.add_parser('deploy', parents=[on_parser], help='deploy the configuration')
     deploy_parser.set_defaults(func=self.deploy)
 
     # subparser for the 'plan' command
