@@ -21,5 +21,9 @@
             inputsFrom = [ self.packages.${system}.default ];
           };
       }
-    );
+    ) // {
+      modules = {
+        virtualbox = import ./nix/virtualbox;
+      };
+    };
 }
