@@ -151,7 +151,7 @@ class App:
       cmd += ['--show-trace']
     cmd += ['--out-link', 'main.tf.json', self.generate_terraform_nix()]
 
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, check=True)
 
     if self.config == '.':
       os.makedirs(tf_data_dir, exist_ok=True)
