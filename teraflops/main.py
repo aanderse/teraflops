@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import asyncio
 import contextlib
 import json
 import logging
@@ -504,9 +505,94 @@ class App:
 
     subprocess.run(cmd, check=True)
 
+  # adapted from https://github.com/zhaofengli/colmena/blob/main/src/nix/host/ssh.rs
+  # TODO: it would be nice to get a 'reboot' command right into colmena
   def reboot(self, args):
-    logging.fatal('not yet implemented')
-    sys.exit(1)
+    # TODO: error handling
+
+    nodes = self.query_deployment()
+    count = len(nodes)
+
+    if not (args.on is None):
+      node_filter = NodeFilter(args.on)
+      nodes = node_filter.filter(nodes)
+
+    logging.info('Enumerating nodes..')
+
+    if nodes:
+      logging.info(f'Selected {len(nodes)} out of {count} hosts.')
+    else:
+      logging.warning('No hosts selected (0 skipped).')
+
+    length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
+
+    def ssh(node, command, ssh_args=None):
+      cmd = ['ssh',
+        '-o',
+        'StrictHostKeyChecking=accept-new',
+        '-o',
+        'BatchMode=yes',
+        '-T',
+      ]
+
+      if ssh_args:
+        cmd += ssh_args
+
+      if os.environ.get('SSH_CONFIG_FILE'):
+        cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
+
+      if node.get('targetPort'):
+        cmd += ['-p', node['targetPort']]
+
+      if node.get('targetUser'):
+        cmd += ['-l', node.get('targetUser')]
+
+      cmd += [node['targetHost']]
+      cmd += command
+
+      return cmd
+
+    async def get_boot_id(node):
+      ssh_args = ['-o', 'ConnectTimeout=10'] # see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
+      proc = await asyncio.create_subprocess_exec(*ssh(node, ['cat', '/proc/sys/kernel/random/boot_id'], ssh_args), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+      stdout, _ = await proc.communicate()
+
+      return None if proc.returncode != 0 else stdout.decode()
+
+    async def initiate_reboot(node):
+      proc = await asyncio.create_subprocess_exec(*ssh(node, ['reboot']), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+      stdout, _ = await proc.communicate()
+
+      if proc.returncode == 0 or proc.returncode == 255:
+        return stdout.decode()
+
+    async def reboot(name, node):
+      print(colored(name.ljust(length), attrs=['bold']), '| Rebooting')
+
+      if args.no_wait:
+        return await initiate_reboot(node)
+
+      old_id = await get_boot_id(node)
+
+      await initiate_reboot(node)
+
+      print(colored(name.ljust(length), attrs=['bold']), '| Waiting for reboot')
+
+      while True:
+        new_id = await get_boot_id(node)
+        if new_id and new_id != old_id:
+          break
+
+        await asyncio.sleep(2)
+
+      print(colored(name.ljust(length), color='green', attrs=['bold']), '|', colored('Rebooted', color='green'))
+
+    async def run():
+      tasks = [reboot(name, node) for name, node in nodes.items()]
+      return await asyncio.gather(*tasks)
+
+    asyncio.run(run())
+    print(''.ljust(length), '|', colored('All done!', color='green'))
 
   def run(self):
     parser = argparse.ArgumentParser(description='a terraform ops tool which is sure to be a flop')
