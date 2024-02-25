@@ -637,15 +637,21 @@ class App:
       parser.print_help()
 
 def main():
-  handler = logging.StreamHandler()
-  handler.setFormatter(ColmenaFormatter('%(message)s'))
+  try:
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColmenaFormatter('%(message)s'))
 
-  logging.getLogger().addHandler(handler)
-  logging.getLogger().setLevel(logging.INFO) # TODO: observe RUST_LOG environment variable, --verbose + --quiet
+    logging.getLogger().addHandler(handler)
+    logging.getLogger().setLevel(logging.INFO) # TODO: observe RUST_LOG environment variable, --verbose + --quiet
 
-  with tempfile.TemporaryDirectory(prefix='teraflops.', delete=True) as tempdir:
-    app = App(tempdir)
-    app.run()
+    with tempfile.TemporaryDirectory(prefix='teraflops.', delete=True) as tempdir:
+      app = App(tempdir)
+      app.run()
+  except KeyboardInterrupt:
+    try:
+      sys.exit(130)
+    except SystemExit:
+      os._exit(130)
 
 if __name__ == '__main__':
   main()
