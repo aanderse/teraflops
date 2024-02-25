@@ -65,6 +65,33 @@ class Rule:
 
   def matches_tag(self, tags):
     return any(re.match(self.pattern, tag) for tag in tags)
+
+def ssh(node, command, ssh_args=None):
+  cmd = ['ssh',
+    '-o',
+    'StrictHostKeyChecking=accept-new',
+    '-o',
+    'BatchMode=yes',
+    '-T',
+  ]
+
+  if ssh_args:
+    cmd += ssh_args
+
+  if os.environ.get('SSH_CONFIG_FILE'):
+    cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
+
+  if node.get('targetPort'):
+    cmd += ['-p', node['targetPort']]
+
+  if node.get('targetUser'):
+    cmd += ['-l', node.get('targetUser')]
+
+  cmd += [node['targetHost']]
+  cmd += command
+
+  return cmd
+
 class App:
   def __init__(self, tempdir):
     self.tempdir = tempdir
@@ -325,41 +352,22 @@ class App:
   def check(self, args):
     nodes = self.query_deployment()
 
-    processes = dict()
-    for name, data in nodes.items():
-      cmd = ['ssh',
-        '-o',
-        'StrictHostKeyChecking=accept-new',
-        '-o',
-        'BatchMode=yes',
-        '-T',
-      ]
-
-      if os.environ.get('SSH_CONFIG_FILE'):
-        cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
-
-      if data.get('targetPort'):
-        cmd += ['-p', data['targetPort']]
-
-      if data.get('targetUser'):
-        cmd += ['-l', data.get('targetUser')]
-
-      cmd += [data['targetHost']]
-      cmd += ['uptime']
-
-      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, encoding='UTF-8')
-
-      processes[name] = process
-
     length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
 
-    for name, process in processes.items():
-      rc = process.wait()
+    async def uptime(name, node):
+      process = await asyncio.create_subprocess_exec(*ssh(node, ['uptime']), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+      stdout, _ = await process.communicate()
 
-      if rc != 0:
+      if process.returncode != 0:
         print(colored(name.ljust(length), color='red', attrs=['bold']), '|', colored('unavailable', color='red'))
       else:
-        print(colored(name.ljust(length), color='green', attrs=['bold']), '|', colored(process.stdout.read().rstrip(), color='green'))
+        print(colored(name.ljust(length), color='green', attrs=['bold']), '|', colored(stdout.decode().rstrip(), color='green'))
+
+    async def run():
+      tasks = [uptime(name, node) for name, node in nodes.items()]
+      return await asyncio.gather(*tasks)
+
+    asyncio.run(run())
 
   def ssh(self, args):
     nodes = self.query_deployment()
@@ -400,49 +408,28 @@ class App:
     else:
       logging.warning('No hosts selected (0 skipped).')
 
-    processes = dict()
-    for name, data in nodes.items():
-      cmd = ['ssh',
-        '-o',
-        'StrictHostKeyChecking=accept-new',
-        '-o',
-        'BatchMode=yes',
-        '-T',
-      ]
-
-      if os.environ.get('SSH_CONFIG_FILE'):
-        cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
-
-      if data.get('targetPort'):
-        cmd += ['-p', data['targetPort']]
-
-      if data.get('targetUser'):
-        cmd += ['-l', data.get('targetUser')]
-
-      cmd += [data['targetHost']]
-      cmd += args.command
-
-      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
-
-      processes[name] = process
-
     length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
 
-    for name, process in processes.items():
-      rc = process.wait()
+    async def execute(name, node):
+      process = await asyncio.create_subprocess_exec(*ssh(node, args.command), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+      stdout, stderr = await process.communicate()
 
-      while True:
-        line = process.stdout.readline()
-        if line:
-          print(colored(name.ljust(length), attrs=['bold']), '|', line.rstrip())
-        else:
-          break
+      for line in stdout.decode().splitlines():
+        print(colored(name.ljust(length), attrs=['bold']), '|', line.rstrip())
 
-      if rc != 0:
-        print(colored(name.ljust(length), color='red', attrs=['bold']), '|', colored('Failed: %s' % process.stderr.readline().rstrip(), color='red'))
+      if process.returncode == 0:
+        return stdout.decode()
+
+      if process.returncode != 0:
+        print(colored(name.ljust(length), color='red', attrs=['bold']), '|', colored('Failed: %s' % stderr.decode().rstrip(), color='red'))
       else:
         print(colored(name.ljust(length), color='green', attrs=['bold']), '|', colored('Succeeded', color='green'))
 
+    async def run():
+      tasks = [execute(name, node) for name, node in nodes.items()]
+      return await asyncio.gather(*tasks)
+
+    asyncio.run(run())
     print(''.ljust(length), '|', colored('All done!', color='green'))
 
   def scp(self, args):
@@ -525,32 +512,6 @@ class App:
       logging.warning('No hosts selected (0 skipped).')
 
     length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
-
-    def ssh(node, command, ssh_args=None):
-      cmd = ['ssh',
-        '-o',
-        'StrictHostKeyChecking=accept-new',
-        '-o',
-        'BatchMode=yes',
-        '-T',
-      ]
-
-      if ssh_args:
-        cmd += ssh_args
-
-      if os.environ.get('SSH_CONFIG_FILE'):
-        cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
-
-      if node.get('targetPort'):
-        cmd += ['-p', node['targetPort']]
-
-      if node.get('targetUser'):
-        cmd += ['-l', node.get('targetUser')]
-
-      cmd += [node['targetHost']]
-      cmd += command
-
-      return cmd
 
     async def get_boot_id(node):
       ssh_args = ['-o', 'ConnectTimeout=10'] # see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
