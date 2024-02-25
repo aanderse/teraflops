@@ -240,6 +240,8 @@ class App:
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=False), 'apply']
     if args.show_trace:
       cmd += ['--show-trace']
+    if args.verbose:
+      cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10']
@@ -262,6 +264,8 @@ class App:
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
     if args.show_trace:
       cmd += ['--show-trace']
+    if args.verbose:
+      cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'build']
@@ -271,6 +275,8 @@ class App:
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
     if args.show_trace:
       cmd += ['--show-trace']
+    if args.verbose:
+      cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'push']
@@ -280,6 +286,8 @@ class App:
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
     if args.show_trace:
       cmd += ['--show-trace']
+    if args.verbose:
+      cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10']
@@ -490,6 +498,7 @@ class App:
     parser.add_argument('-f', '--config', default='.', help='...')
     parser.add_argument('--show-trace', action='store_true', help='passes --show-trace to nix commands')
     parser.add_argument('-q', '--quiet', action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     on_parser = argparse.ArgumentParser(add_help=False)
     on_parser.add_argument('--on', metavar='<NODES>', help='select a list of nodes to deploy to')
