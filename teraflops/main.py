@@ -232,7 +232,12 @@ class App:
   def deploy(self, args):
     # apply
     self.generate_main_tf_json(refresh=True)
-    subprocess.run(['terraform', 'apply'], check=True)
+
+    cmd = ['terraform', 'apply']
+    if args.confirm:
+      cmd += ['-auto-approve']
+
+    subprocess.run(cmd, check=True)
 
     self.generate_terraform_json(need_tf_file=False)
 
@@ -258,7 +263,12 @@ class App:
 
   def apply(self, args):
     self.generate_main_tf_json(refresh=True)
-    subprocess.run(['terraform', 'apply'], check=True) #check=False)
+
+    cmd = ['terraform', 'apply']
+    if args.confirm:
+      cmd += ['-auto-approve']
+
+    subprocess.run(cmd, check=True)
 
   def build(self, args):
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'apply']
@@ -299,7 +309,12 @@ class App:
 
   def destroy(self, args):
     self.generate_main_tf_json(refresh=True)
-    subprocess.run(['terraform', 'apply', '-destroy'], check=True)
+
+    cmd = ['terraform', 'apply', '-destroy']
+    if args.confirm:
+      cmd += ['-auto-approve']
+
+    subprocess.run(cmd, check=True)
 
   def info(self, args):
     with open(self.generate_terraform_json(), 'r') as fp:
@@ -500,6 +515,9 @@ class App:
     parser.add_argument('-q', '--quiet', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')
 
+    confirm_parser = argparse.ArgumentParser(add_help=False)
+    confirm_parser.add_argument('--confirm', action='store_true', help='confirm dangerous operations; do not ask')
+
     on_parser = argparse.ArgumentParser(add_help=False)
     on_parser.add_argument('--on', metavar='<NODES>', help='select a list of nodes to deploy to')
 
@@ -525,7 +543,7 @@ class App:
     eval_jobs_parser.add_argument('expr', type=str)
 
     # subparser for the 'deploy' command
-    deploy_parser = subparsers.add_parser('deploy', parents=[on_parser], help='deploy the configuration')
+    deploy_parser = subparsers.add_parser('deploy', parents=[confirm_parser, on_parser], help='deploy the configuration')
     deploy_parser.set_defaults(func=self.deploy)
     deploy_parser.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
 
@@ -534,7 +552,7 @@ class App:
     plan_parser.set_defaults(func=self.plan)
 
     # subparser for the 'apply' command
-    apply_parser = subparsers.add_parser('apply', help='create or update all resources in the deployment')
+    apply_parser = subparsers.add_parser('apply', parents=[confirm_parser], help='create or update all resources in the deployment')
     apply_parser.set_defaults(func=self.apply)
 
     # subparser for the 'build' command
@@ -551,7 +569,7 @@ class App:
     activate_parser.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
 
     # subparser for the 'destroy' command
-    destroy_parser = subparsers.add_parser('destroy', help='destroy all resources in the deployment')
+    destroy_parser = subparsers.add_parser('destroy', parents=[confirm_parser], help='destroy all resources in the deployment')
     destroy_parser.set_defaults(func=self.destroy)
 
     # subparser for the 'info' command
