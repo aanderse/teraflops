@@ -242,7 +242,12 @@ class App:
       cmd += ['--show-trace']
     if args.on:
       cmd += ['--on', args.on]
-    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'switch']
+    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10']
+    if args.reboot:
+      cmd += ['boot', '--reboot']
+    else:
+      cmd += ['switch']
+
     subprocess.run(cmd, check=True)
 
   def plan(self, args):
@@ -277,7 +282,11 @@ class App:
       cmd += ['--show-trace']
     if args.on:
       cmd += ['--on', args.on]
-    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'switch']
+    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10']
+    if args.reboot:
+      cmd += ['boot', '--reboot']
+    else:
+      cmd += ['switch']
     subprocess.run(cmd, check=True)
 
   def destroy(self, args):
@@ -509,6 +518,7 @@ class App:
     # subparser for the 'deploy' command
     deploy_parser = subparsers.add_parser('deploy', parents=[on_parser], help='deploy the configuration')
     deploy_parser.set_defaults(func=self.deploy)
+    deploy_parser.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
 
     # subparser for the 'plan' command
     plan_parser = subparsers.add_parser('plan', help='show changes required by the current configuration')
@@ -529,6 +539,7 @@ class App:
     # subparser for the 'activate' command
     activate_parser = subparsers.add_parser('activate', parents=[on_parser], help='apply configurations on remote nodes')
     activate_parser.set_defaults(func=self.activate)
+    activate_parser.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
 
     # subparser for the 'destroy' command
     destroy_parser = subparsers.add_parser('destroy', help='destroy all resources in the deployment')
