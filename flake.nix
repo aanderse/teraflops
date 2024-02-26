@@ -23,6 +23,7 @@
       }
     ) // {
       modules = {
+        hcloud = import ./nix/hcloud;
         virtualbox = import ./nix/virtualbox;
       };
     };
