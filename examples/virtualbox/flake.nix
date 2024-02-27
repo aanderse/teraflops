@@ -49,12 +49,7 @@
           deployment.virtualbox = {
             vcpu = 2;
             memorySize = "1.0 gib";
-            clientPublicKey = "ssh-ed25519 AAAA... insert your ssh public key here";
           };
-
-          users.users.root.openssh.authorizedKeys.keys = [
-            config.deployment.virtualbox.clientPublicKey
-          ];
 
           system.stateVersion = "23.11";
         };

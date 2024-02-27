@@ -39,7 +39,6 @@
           deployment.hcloud = {
             serverType = "cx11";
             location = "hel1";
-            clientPublicKey = "ssh-ed25519 AAAA... insert your ssh public key here";
           };
 
           system.stateVersion = "23.11";

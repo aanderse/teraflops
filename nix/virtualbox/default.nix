@@ -22,13 +22,6 @@ in
               Memory size of the virtual machine, allowing for human friend units like `mb`, `mib`, etc...
             '';
           };
-
-          clientPublicKey = mkOption {
-            type = types.str;
-            description = ''
-              SSH public key used to initially connect to the VM.
-            '';
-          };
         };
       });
       default = null;
@@ -47,6 +40,10 @@ in
 
       services.openssh.enable = true;
       services.openssh.authorizedKeysFiles = [ ".vbox-nixops-client-key" ];
+
+      users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
+        resources.tls_private_key.teraflops.public_key_openssh
+      ];
 
       # VirtualBox doesn't seem to lease IP addresses persistently, so we
       # may get a different IP address if dhcpcd is restarted.  So don't
@@ -82,14 +79,16 @@ in
         memory = node.config.deployment.virtualbox.memorySize;
 
         network_adapter = {
-          type           = "hostonly";
+          type = "hostonly";
           host_interface = "vboxnet0";
         };
 
-        provisioner.local-exec = {
-          command = ''
-            VBoxManage guestproperty set ''${self.id} /VirtualBox/GuestInfo/Charon/ClientPublicKey "${node.config.deployment.virtualbox.clientPublicKey}"
-          '';
+        provisioner = mkIf node.config.deployment.provisionSSHKey {
+          local-exec = {
+            command = ''
+              VBoxManage guestproperty set ''${self.id} /VirtualBox/GuestInfo/Charon/ClientPublicKey "''${trimspace(tls_private_key.teraflops.public_key_openssh)}"
+            '';
+          };
         };
 
         lifecycle = {

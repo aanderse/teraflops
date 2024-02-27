@@ -36,13 +36,6 @@ in
               found `here <https://www.hetzner.de/cloud#pricing>`_.
             '';
           };
-
-          clientPublicKey = mkOption {
-            type = types.str;
-            description = ''
-              SSH public key used to initially connect to the VM.
-            '';
-          };
         };
       });
       default = null;
@@ -68,8 +61,8 @@ in
 
       services.openssh.enable = true;
 
-      users.users.root.openssh.authorizedKeys.keys = [
-        config.deployment.hcloud.clientPublicKey
+      users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
+        resources.tls_private_key.teraflops.public_key_openssh
       ];
     };
   };
@@ -95,13 +88,13 @@ in
         image = "ubuntu-22.04";
         server_type = deployment.hcloud.serverType;
 
-        user_data = ''
+        user_data = mkIf node.config.deployment.provisionSSHKey ''
           #cloud-config
           users:
             - name: root
               lock_passwd: true
               ssh_authorized_keys:
-                - ${deployment.hcloud.clientPublicKey}
+                - ''${trimspace(tls_private_key.teraflops.public_key_openssh)}
           chpasswd:
             expire: false
         '';
@@ -111,6 +104,7 @@ in
           user = deployment.targetUser;
           host = deployment.targetHost;
           port = mkIf (deployment.targetPort != null) deployment.targetPort;
+          private_key = mkIf node.config.deployment.provisionSSHKey "\${tls_private_key.teraflops.public_key_openssh}";
         };
 
         provisioner.remote-exec = {

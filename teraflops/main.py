@@ -66,6 +66,21 @@ class Rule:
   def matches_tag(self, tags):
     return any(re.match(self.pattern, tag) for tag in tags)
 
+def ssh_config(private_key, tempdir):
+  ssh_config_file = os.path.join(tempdir, '.ssh', 'config')
+  private_key_file = os.path.join(tempdir, '.ssh', 'id_ed25519')
+
+  os.makedirs(os.path.join(tempdir, '.ssh'), mode=0o700)
+
+  with open(private_key_file, mode="w", opener=lambda path, flags: os.open(path, flags, 0o600)) as fp:
+    fp.write(private_key)
+
+  with open(ssh_config_file, mode="w") as fp:
+    # ConnectTimeout: see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
+    fp.write('Host *\n  ConnectTimeout=10s\n  IdentityFile %s' % private_key_file)
+
+  os.environ['SSH_CONFIG_FILE'] = ssh_config_file
+
 def ssh(node, command, ssh_args=None):
   cmd = ['ssh',
     '-o',
@@ -133,6 +148,15 @@ class App:
     with open(os.path.join(self.tempdir, 'terraform.json'), 'w') as f:
       f.write(json.dumps(dict(outputs=outputs_data, resources=resources_data), indent=2, sort_keys=True))
 
+    if not os.environ.get('SSH_CONFIG_FILE'):
+      try:
+        private_key = outputs['teraflops']['value']['privateKey']
+      except KeyError:
+        pass
+
+      if private_key is not None:
+        ssh_config(private_key, self.tempdir)
+
     return os.path.join(self.tempdir, 'terraform.json')
 
   def generate_eval_nix(self):
@@ -195,16 +219,20 @@ class App:
 
     try:
       output = json.loads(process.stdout)
-
-      if 'nodes' in output:
-          return output['nodes']
     except:
-      pass
+      process = subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval', '-E', '{ nodes, pkgs, lib }: { privateKey = null; nodes = lib.mapAttrs (_: node: { inherit (node.config.deployment) provisionSSHKey tags targetEnv targetHost targetPort targetUser; }) nodes; }'], stdout=subprocess.PIPE, check=True)
+      output = json.loads(process.stdout)
 
-    process = subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval', '-E', '{ nodes, pkgs, lib }: lib.mapAttrs (_: node: { inherit (node.config.deployment) tags targetHost targetPort targetUser; }) nodes'], stdout=subprocess.PIPE, check=True)
-    data = json.loads(process.stdout)
+    if not os.environ.get('SSH_CONFIG_FILE'):
+      try:
+        private_key = output['privateKey']
+      except KeyError:
+        pass
 
-    return data
+      if private_key is not None:
+        ssh_config(private_key, self.tempdir)
+
+    return output['nodes']
 
   def tf(self, args):
     # needs: main.tf.json (needs: eval.nix, hive.nix, terraform.nix)
@@ -346,8 +374,17 @@ class App:
 
   def info(self, args):
     with open(self.generate_terraform_json(), 'r') as fp:
-     data = json.load(fp)
-     print(json.dumps(data['resources'], indent=2))
+      data = json.load(fp)
+
+    # filter out internal state
+    try:
+      del data['resources']['tls_private_key']['teraflops']
+      if not data['resources']['tls_private_key']:
+        del data['resources']['tls_private_key']
+    except KeyError:
+      pass
+
+    print(json.dumps(data['resources'], indent=2))
 
   def check(self, args):
     nodes = self.query_deployment()
