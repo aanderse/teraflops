@@ -6,39 +6,59 @@ in
   defaults = { modulesPath, name, config, pkgs, lib, ... }: with lib; {
     options.deployment.hcloud = mkOption {
       type = with types; nullOr (submodule {
+        freeformType = (pkgs.formats.json {}).type;
         options = {
-
-          location = mkOption {
-            type = with types; nullOr (enum ["nbg1" "fsn1" "hel1" "ash" "hil"]);
-            default = null;
-            example = "nbg1";
-            description = ''
-              The ID of the location to create the server in.
-            '';
-          };
-
           name = mkOption {
-            type = types.str;
+            type = types.strMatching "^$|^[[:alnum:]]([[:alnum:]_-]{0,61}[[:alnum:]])?$";
             default = name;
-            example = "custom-server-name";
             description = ''
-              The Hetzner Cloud Server Instance `name`. This name
-              must be unique within the scope of the Hetzner Cloud Project.
+              Name of the server to create (must be unique per project and a valid hostname as per RFC 1123).
             '';
           };
 
-          serverType = mkOption {
+          server_type = mkOption {
             type = types.str;
-            default = "cx11";
             example = "cpx31";
             description = ''
-              The Hetzner Cloud Server Instance type. A list of valid types can be
-              found `here <https://www.hetzner.de/cloud#pricing>`_.
+              Name of the server type this server should be created with.
             '';
+          };
+        };
+
+        config = {
+          image = "ubuntu-22.04";
+
+          user_data = mkIf config.deployment.provisionSSHKey ''
+            #cloud-config
+            users:
+              - name: root
+                lock_passwd: true
+                ssh_authorized_keys:
+                  - ''${trimspace(tls_private_key.teraflops.public_key_openssh)}
+            chpasswd:
+              expire: false
+          '';
+
+          connection = {
+            type = "ssh";
+            user = config.deployment.targetUser;
+            host = config.deployment.targetHost;
+            port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
+            private_key = mkIf config.deployment.provisionSSHKey "\${tls_private_key.teraflops.public_key_openssh}";
+          };
+
+          provisioner.remote-exec = {
+            inline = [
+              "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
+              "shutdown -r +0"
+            ];
           };
         };
       });
       default = null;
+      description = ''
+        `hcloud_server` configuration, see [argument reference](https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs/resources/server#argument-reference) for supported values.
+      '';
     };
 
     config = mkIf (config.deployment.targetEnv == "hcloud") {
@@ -81,39 +101,7 @@ in
       nodes' = filterAttrs (_: node: node.config.deployment.targetEnv == "hcloud") nodes;
     in
     {
-      hcloud_server = mapAttrs (name: node: with node.config; {
-        name = deployment.hcloud.name;
-        location = deployment.hcloud.location;
-
-        image = "ubuntu-22.04";
-        server_type = deployment.hcloud.serverType;
-
-        user_data = mkIf node.config.deployment.provisionSSHKey ''
-          #cloud-config
-          users:
-            - name: root
-              lock_passwd: true
-              ssh_authorized_keys:
-                - ''${trimspace(tls_private_key.teraflops.public_key_openssh)}
-          chpasswd:
-            expire: false
-        '';
-
-        connection = {
-          type = "ssh";
-          user = deployment.targetUser;
-          host = deployment.targetHost;
-          port = mkIf (deployment.targetPort != null) deployment.targetPort;
-          private_key = mkIf node.config.deployment.provisionSSHKey "\${tls_private_key.teraflops.public_key_openssh}";
-        };
-
-        provisioner.remote-exec = {
-          inline = [
-            "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
-            "shutdown -r +0"
-          ];
-        };
-      }) nodes';
+      hcloud_server = mapAttrs (_: node: node.config.deployment.hcloud) nodes';
     };
 } // lib.mapAttrs (_: node: { modulesPath, ... }: {
   imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];

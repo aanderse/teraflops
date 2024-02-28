@@ -3,28 +3,52 @@ let
   nodes' = lib.filterAttrs (_: node: node.targetEnv == "virtualbox") (outputs.teraflops.nodes or {});
 in
 {
-  defaults = { modulesPath, name, config, pkgs, lib, ... }: with lib; {
+  defaults = { name, config, pkgs, lib, ... }: with lib; {
     options.deployment.virtualbox = mkOption {
       type = with types; nullOr (submodule {
+        freeformType = (pkgs.formats.json {}).type;
         options = {
-          vcpu = mkOption {
-            type = types.ints.unsigned;
-            default = 2;
-            description = ''
-              The number of virtual CPUs.
-            '';
+          name = mkOption {
+            type = types.str;
+            default = name;
+            description = "The name of the virtual machine.";
+          };
+        };
+
+        config = {
+          image =
+            let
+              ova = (import "${pkgs.path}/nixos/lib/eval-config.nix" {
+                modules = [ ./virtualbox-image-nixops.nix ];
+              }).config.system.build.virtualBoxOVA;
+            in
+              "${ova}/nixos-${config.system.nixos.version}-${config.nixpkgs.system}.ova";
+
+          # https://www.roksblog.de/terraform-virtualbox-provider-terrafarm/
+          network_adapter = {
+            type = "hostonly";
+            host_interface = "vboxnet0";
           };
 
-          memorySize = mkOption {
-            type = types.str;
-            default = "512 mib";
-            description = ''
-              Memory size of the virtual machine, allowing for human friend units like `mb`, `mib`, etc...
-            '';
+          provisioner = mkIf config.deployment.provisionSSHKey {
+            local-exec = {
+              command = ''
+                VBoxManage guestproperty set ''${self.id} /VirtualBox/GuestInfo/Charon/ClientPublicKey "''${trimspace(tls_private_key.teraflops.public_key_openssh)}"
+              '';
+            };
+          };
+
+          lifecycle = {
+            ignore_changes = [
+              "image"
+            ];
           };
         };
       });
       default = null;
+      description = ''
+        `virtualbox_vm` configuration, see [argument reference](https://registry.terraform.io/providers/terra-farm/virtualbox/latest/docs/resources/vm#argument-reference) for supported values.
+      '';
     };
 
     config = mkIf (config.deployment.targetEnv == "virtualbox") {
@@ -61,42 +85,12 @@ in
     };
   };
 
-  resource = { nodes, pkgs, lib, ... }: with lib;
+  resource = { nodes, lib, ... }: with lib;
     let
       nodes' = filterAttrs (_: node: node.config.deployment.targetEnv == "virtualbox") nodes;
-
-      ova = (import "${pkgs.path}/nixos/lib/eval-config.nix" {
-        modules = [ ./virtualbox-image-nixops.nix ];
-      }).config.system.build.virtualBoxOVA;
     in
     {
-      # https://www.roksblog.de/terraform-virtualbox-provider-terrafarm/
-      virtualbox_vm = mapAttrs (name: node: {
-        inherit name;
-
-        image = "${ova}/nixos-${node.config.system.nixos.version}-${node.config.nixpkgs.system}.ova";
-        cpus = node.config.deployment.virtualbox.vcpu;
-        memory = node.config.deployment.virtualbox.memorySize;
-
-        network_adapter = {
-          type = "hostonly";
-          host_interface = "vboxnet0";
-        };
-
-        provisioner = mkIf node.config.deployment.provisionSSHKey {
-          local-exec = {
-            command = ''
-              VBoxManage guestproperty set ''${self.id} /VirtualBox/GuestInfo/Charon/ClientPublicKey "''${trimspace(tls_private_key.teraflops.public_key_openssh)}"
-            '';
-          };
-        };
-
-        lifecycle = {
-          ignore_changes = [
-            "image"
-          ];
-        };
-      }) nodes';
+      virtualbox_vm = mapAttrs (_: node: node.config.deployment.virtualbox) nodes';
     };
 } // lib.mapAttrs (_: node: { modulesPath, ... }: {
   imports = [ "${modulesPath}/virtualisation/virtualbox-image.nix" ];
