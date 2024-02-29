@@ -190,6 +190,14 @@ class App:
 
     return os.path.join(self.tempdir, 'terraform.nix')
 
+  def generate_repl_nix(self):
+    repl_nix = files('teraflops.nix').joinpath('repl.nix').read_text()
+
+    with open(os.path.join(self.tempdir, 'repl.nix'), 'w') as f:
+      f.write(repl_nix % files('teraflops.nix').joinpath('colmena'))
+
+    return os.path.join(self.tempdir, 'repl.nix')
+
   # NOTE: only cache/use cached main.tf.json if no --config is specified
   def generate_main_tf_json(self, refresh: bool):
     tf_data_dir = os.getenv('TF_DATA_DIR', '.terraform')
@@ -261,10 +269,16 @@ class App:
     subprocess.run(cmd, check=True)
 
   def repl(self, args):
-    # TODO: add `resources` argument to `teraflops repl`
-    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'repl']
+    self.generate_hive_nix(full_eval=True)
+    cmd = ['nix', 'repl']
+    # if nix_version.at_least(2, 4):
+    cmd += ['--experimental-features', 'nix-command flakes']
     if args.show_trace:
       cmd += ['--show-trace']
+    # if nix_version.at_least(2, 10):
+    #   repl_cmd.arg("--file");
+    cmd += [self.generate_repl_nix()]
+
     subprocess.run(cmd, check=True)
 
   def eval(self, args):
