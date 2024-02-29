@@ -13,16 +13,6 @@
         inherit system;
         config.allowUnfree = true;
       };
-
-      virtualbox' = pkgs.terraform-providers.mkProvider {
-        hash = "sha256-Oijdx22s7wIDC+Sms097rFVNRF9tzMlUNlPMV7GSsiI=";
-        homepage = "https://registry.terraform.io/providers/terra-farm/virtualbox";
-        owner = "terra-farm";
-        repo = "terraform-provider-virtualbox";
-        rev = "v0.2.2-alpha.1";
-        spdx = "MIT";
-        vendorHash = "sha256-SF11E60OQiRdf+Pf6XyJg60yGRnGOcSzhrYccrWaeYE=";
-      };
     in
     {
       devShells.${system}.default = with pkgs;
@@ -32,7 +22,7 @@
           packages = [
             colmena
             jq
-            (terraform.withPlugins (p: [ virtualbox' ]))
+            (terraform.withPlugins (p: [ p.tls p.virtualbox ]))
             teraflops.packages.${system}.default
           ];
         };
@@ -47,8 +37,8 @@
         defaults = { config, ... }: {
           deployment.targetEnv = "virtualbox";
           deployment.virtualbox = {
-            vcpu = 2;
-            memorySize = "1.0 gib";
+            cpus = 2;
+            memory = "1.0 gib";
           };
 
           system.stateVersion = "23.11";

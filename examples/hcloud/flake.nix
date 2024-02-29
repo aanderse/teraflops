@@ -22,7 +22,7 @@
           packages = [
             colmena
             jq
-            (terraform.withPlugins (p: [ p.hcloud ]))
+            (terraform.withPlugins (p: [ p.hcloud p.tls ]))
             teraflops.packages.${system}.default
           ];
         };
@@ -37,7 +37,7 @@
         defaults = { ... }: {
           deployment.targetEnv = "hcloud";
           deployment.hcloud = {
-            serverType = "cx11";
+            server_type = "cx11";
             location = "hel1";
           };
 
