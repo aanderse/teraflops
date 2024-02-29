@@ -24,6 +24,7 @@
     ) // {
       modules = {
         hcloud = import ./nix/hcloud;
+        lxd = import ./nix/lxd;
         virtualbox = import ./nix/virtualbox;
       };
     };
