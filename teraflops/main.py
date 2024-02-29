@@ -152,6 +152,7 @@ class App:
       try:
         private_key = outputs['teraflops']['value']['privateKey']
       except KeyError:
+        private_key = None
         pass
 
       if private_key is not None:
