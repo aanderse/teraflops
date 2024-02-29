@@ -60,8 +60,6 @@ in
       boot.vesa = false;
       boot.loader.timeout = 1;
 
-      networking.hostName = name;
-
       services.openssh.enable = true;
       services.openssh.authorizedKeysFiles = [ ".vbox-nixops-client-key" ];
 
