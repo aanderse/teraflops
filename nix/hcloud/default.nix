@@ -1,4 +1,4 @@
-{ outputs, resources, lib, ... }:
+{ tf, outputs, resources, lib, ... }:
 let
   nodes' = lib.filterAttrs (_: node: node.targetEnv == "hcloud") (outputs.teraflops.nodes or {});
 in
@@ -44,7 +44,7 @@ in
             user = config.deployment.targetUser;
             host = config.deployment.targetHost;
             port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
-            private_key = mkIf config.deployment.provisionSSHKey "\${tls_private_key.teraflops.public_key_openssh}";
+            private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.public_key_openssh");
           };
 
           provisioner.remote-exec = {
@@ -63,9 +63,9 @@ in
 
     config = mkIf (config.deployment.targetEnv == "hcloud") {
       deployment.hcloud = {};
-      deployment.targetHost = if resources.exists
+      deployment.targetHost = if resources != null
         then resources.hcloud_server.${name}.ipv4_address
-        else resources.eval "hcloud_server.${name}.ipv4_address";
+        else tf.ref "hcloud_server.${name}.ipv4_address";
 
       boot.loader.grub.device = "/dev/sda";
       boot.initrd.kernelModules = [ "nvme" ];

@@ -1,4 +1,4 @@
-{ outputs, resources, lib, ... }:
+{ tf, outputs, resources, lib, ... }:
 let
   nodes' = lib.filterAttrs (_: node: node.targetEnv == "lxd") (outputs.teraflops.nodes or {});
 in
@@ -31,7 +31,7 @@ in
 
           file = mkIf config.deployment.provisionSSHKey [
             {
-              content = "\${tls_private_key.teraflops.public_key_openssh}";
+              content = tf.ref "tls_private_key.teraflops.public_key_openssh";
               target_path = "/root/.ssh/authorized_keys";
               mode = "0600";
               create_directories = true;
@@ -47,9 +47,9 @@ in
 
     config = mkIf (config.deployment.targetEnv == "lxd") {
       deployment.lxd = {};
-      deployment.targetHost = if resources.exists
+      deployment.targetHost = if resources != null
         then resources.lxd_instance.${config.deployment.lxd.name}.ipv6_address
-        else "\${lxd_instance.${config.deployment.lxd.name}.ipv6_address}";
+        else tf.ref "lxd_instance.${config.deployment.lxd.name}.ipv6_address";
 
       services.openssh.enable = true;
 

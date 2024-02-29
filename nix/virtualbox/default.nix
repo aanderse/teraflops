@@ -1,4 +1,4 @@
-{ outputs, resources, lib, ... }:
+{ tf, outputs, resources, lib, ... }:
 let
   nodes' = lib.filterAttrs (_: node: node.targetEnv == "virtualbox") (outputs.teraflops.nodes or {});
 in
@@ -53,9 +53,9 @@ in
 
     config = mkIf (config.deployment.targetEnv == "virtualbox") {
       deployment.virtualbox = {};
-      deployment.targetHost = if resources.exists
+      deployment.targetHost = if resources != null
         then (head resources.virtualbox_vm.${name}.network_adapter).ipv4_address
-        else resources.eval "element(virtualbox_vm.${name}.network_adapter, 0).ipv4_address";
+        else tf.ref "element(virtualbox_vm.${name}.network_adapter, 0).ipv4_address";
 
       boot.vesa = false;
       boot.loader.timeout = 1;

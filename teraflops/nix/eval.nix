@@ -20,21 +20,9 @@ let
       value = with builtins; lib.optionalAttrs (pathExists ./terraform.json) (fromJSON (readFile ./terraform.json));
     in
     {
-      outputs = value.outputs or { };
-      resources = value.resources or { };
+      outputs = value.outputs or null;
+      resources = value.resources or null;
     };
-
-  outputs = terraform.outputs;
-  resources =
-    let
-      eval = address:
-        if terraform.resources != { } then
-          lib.getAttrFromPath (lib.splitString "." address) terraform.resources
-        else
-          "\${${address}}"
-      ;
-    in
-      terraform.resources // { inherit eval; exists = terraform.resources != { }; };
 
   module = { options, config, lib, ... }: with lib; {
     options = {
@@ -113,7 +101,10 @@ let
     modules = [
       module
       {
-        _module.args.tf.mkAlias = alias: attrs: { __aliases = { "${alias}" = attrs; }; };
+        _module.args.tf = {
+          mkAlias = alias: attrs: { __aliases = { "${alias}" = attrs; }; };
+          ref = ref: "\${${ref}}";
+        };
       }
       {
         _file = "${flake.outPath}/flake.nix";
@@ -121,7 +112,7 @@ let
       }
     ];
 
-    specialArgs = { inherit outputs resources; };
+    specialArgs = { inherit (terraform) outputs resources; };
   };
 in
   eval
