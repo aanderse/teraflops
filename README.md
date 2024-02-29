@@ -8,101 +8,80 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    teraflops.url = "github:aanderse/teraflops";
   };
 
-  outputs = { nixpkgs, ... }: {
-    teraflops =
-      # resources - the entire state of terraform as a nix attribute set
-      { resources, ... }:
-      {
-        # meta, exactly as defined in a colmena deploy
-        meta = {
-          nixpkgs = import nixpkgs {
-            system = "x86_64-linux";
-          };
-        };
+  outputs = { nixpkgs, teraflops, ... }: {
+    teraflops = {
+      imports = [ teraflops.modules.hcloud ];
 
-        # in this example a single machine is specified
-        machine = { modulesPath, name, pkgs, ... }: {
-          imports = [ "${modulesPath}/virtualisation/lxc-container.nix" ];
-
-          # we're able to directly pull data from terraform state
-          deployment.targetHost = resources.eval "lxd_instance.${name}.ipv4_address";
-
-          environment.systemPackages = [ pkgs.htop ];
-
-          users.users.root.openssh.authorizedKeys.keys = [
-            "ssh-ed25519 AAAA..."
-          ];
-        };
-
-        # exactly as you would define in terraform
-        terraform = {
-          required_providers = {
-            lxd = {
-              source = "terraform-lxd/lxd";
-              version = ">= 2.0.0";
-            };
-          };
-        };
-
-        resource = { nodes, lib, ... }: with lib; {
-          # we're able to create terraform resources based on nixos machines we have defined
-          lxd_instance = mapAttrs (name: node: {
-            inherit name;
-            image = "nixos-23.11";
-
-            file = [
-              {
-                content = concatStringsSep "\n" node.config.users.users.root.openssh.authorizedKeys.keys;
-                target_path = "/root/.ssh/authorized_keys";
-              }
-            ];
-          }) nodes;
+      meta = {
+        nixpkgs = import nixpkgs {
+          system = "x86_64-linux";
         };
       };
+
+      machine = { pkgs, ... }: {
+        deployment.targetEnv = "hcloud";
+        deployment.hcloud = {
+          server_type = "cx11";
+          location = "nbg1";
+        };
+
+        environment.systemPackages = [ pkgs.htop ];
+      };
+
+      # if desired you can write terraform code directly inside your teraflops modules
+      terraform = {
+        backend.s3 = {
+          bucket = "mybucket";
+          key = "path/to/my/key";
+          region = "us-east-1";
+        };
+      };
+    };
   }
 }
 ```
 
-Note the circular nature of the above example: [resource.lxd_instance](https://registry.terraform.io/providers/terraform-lxd/lxd/latest/docs/resources/instance) is defined using `nodes`, an attribute set of our NixOS machines - yet at the same time, `machine` uses `lxd_instance.machine.ipv4_address` to set NixOS options. Additionally, the above example populates the `lxd` container with SSH keys based on configuration from NixOS.
-
 ## Usage
 
-The `teraflops` tool has two low level subcommands which get out of your way and let you use the tools you're used to: `terraform` and `colmena`.
+The `teraflops` tool has a number of high level commands that often resemble the `NixOps` CLI.
 
 ```
-# anything after 'teraflops tf' is passed directly to terraform
+# prepare your terraform state in the current working directory
+teraflops init
+
+# applies all terraform state and deploys your NixOS configuration
+teraflops deploy --reboot --confirm
+
+# perform some operational commands
+teraflops ssh-for-each -- df -h
+teraflops scp machine:/root/.ssh/id_ed25519.pub .
+
+# NixOS introspection
+teraflops repl
+teraflops eval '{ nodes, ... }: builtins.attrNames nodes'
+```
+
+Additionally there are two low level subcommands which get out of your way and let you use the tools you're used to: `terraform` and `colmena`.
+
+```
+# 'teraflops tf' is a direct passthrough to terraform
 teraflops tf init
 teraflops tf apply
 
-# anything after 'teraflops nix' is passed directly to colmena
+# 'teraflops nix' is a direct passthrough to colmena
 teraflops nix repl
 teraflops nix apply --reboot
 ```
 
-There is a set of subcommands that act as high level abstraction over the tool that somewhat attempt to mimic parts of the `NixOps` command, but these are experimental and subject to change.
-
-```
-teraflops ssh-for-each -- df -h
-teraflops scp machine:/root/.ssh/id_ed25519.pub .
-```
-
-## Future
-
-I'm experimenting around with some higher level abstractions which directly mimic NixOps plugins. The idea is that one could create various NixOS options under `deployment` to ease creation of NixOS resources. Ideally it would look something like this:
-
-```
-{ config, pkgs, lib, ... }: {
-  deployment.targetEnv = "hcloud";
-  deployment.hcloud = {
-    serverType = "cx11";
-  };
-};
-```
-
-This [terranix](https://github.com/terranix/terranix) team has done some really cool work like this.
-
 ## Implementation
 
 A very quick `python` script I hacked together which isn't great. Don't look at the code yet... really 😅
+
+## See also
+
+- [colmena](https://github.com/zhaofengli/colmena) - used by `teraflops` to manage deployments
+- [NixOps](https://github.com/NixOS/nixops) - inspiration for `teraflops`
+- [terranix](https://github.com/terranix/terranix) - inspiration for `teraflops`
