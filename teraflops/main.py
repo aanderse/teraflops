@@ -250,7 +250,14 @@ class App:
 
   def init(self, args):
     self.generate_main_tf_json(refresh=True)
-    subprocess.run(['terraform', 'init'], check=True)
+    cmd = ['terraform', 'init']
+    if args.migrate_state:
+      cmd += ['-migrate-state']
+    if args.reconfigure:
+      cmd += ['-reconfigure']
+    if args.upgrade:
+      cmd += ['-upgrade']
+    subprocess.run(cmd, check=True)
 
   def repl(self, args):
     # TODO: add `resources` argument to `teraflops repl`
@@ -610,6 +617,9 @@ class App:
     # subparser for the 'init' command
     init_parser = subparsers.add_parser('init', help='prepare your working directory for other commands')
     init_parser.set_defaults(func=self.init)
+    init_parser.add_argument('--migrate-state', action='store_true', help='reconfigure a backend, and attempt to migrate any existing state')
+    init_parser.add_argument('--reconfigure', action='store_true', help='reconfigure a backend, ignoring any saved configuration')
+    init_parser.add_argument('--upgrade', action='store_true', help='install the latest module and provider versions allowed within configured constraints, overriding the default behavior of selecting exactly the version recorded in the dependency lockfile.')
 
     # subparser for the 'repl' command
     repl_parser = subparsers.add_parser('repl', help='start an interactive REPL with the complete configuration')
