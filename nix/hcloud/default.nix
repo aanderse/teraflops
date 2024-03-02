@@ -44,7 +44,7 @@ in
             user = config.deployment.targetUser;
             host = config.deployment.targetHost;
             port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
-            private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.public_key_openssh");
+            private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
           };
 
           provisioner.remote-exec = {
