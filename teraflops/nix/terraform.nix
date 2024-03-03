@@ -1,3 +1,4 @@
+# this file takes a teraflops deploy and turns it into something terraform expects
 { path ? "%s" }:
 let
   colmena = import "${path}/eval.nix" {
@@ -32,6 +33,7 @@ in
         });
     in
       value // optionalAttrs (value ? provider) {
+        # hack to account for provider aliases: https://developer.hashicorp.com/terraform/language/providers/configuration#alias-multiple-provider-configurations
         provider = flatten (mapAttrsToList (name: attrs: [ { "${name}" = builtins.removeAttrs attrs ["__aliases"]; } ] ++ (mapAttrsToList (k: v: { "${k}" = v; }) (attrs.__aliases or { }))) value.provider);
       }
   ))

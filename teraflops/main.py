@@ -244,8 +244,6 @@ class App:
     return output['nodes']
 
   def tf(self, args):
-    # needs: main.tf.json (needs: eval.nix, hive.nix, terraform.nix)
-
     self.generate_main_tf_json(refresh=True)
     subprocess.run([self.terraform] + args.passthru, check=True)
 
@@ -254,7 +252,6 @@ class App:
       logging.fatal('cannot pass through --config argument to colmena')
       sys.exit(1)
 
-    # needs: eval.nix, hive.nix, terraform.json (needs: main.tf.json, eval.nix, hive.nix, terraform.nix)
     subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True)] + args.passthru, check=True)
 
   def init(self, args):
@@ -271,7 +268,6 @@ class App:
   def repl(self, args):
     self.generate_hive_nix(full_eval=True)
     cmd = ['nix', 'repl']
-    # if nix_version.at_least(2, 4):
     cmd += ['--experimental-features', 'nix-command flakes']
     if args.show_trace:
       cmd += ['--show-trace']

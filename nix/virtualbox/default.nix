@@ -40,6 +40,7 @@ in
 
           lifecycle = {
             ignore_changes = [
+              # image depends on pkgs which will change
               "image"
             ];
           };

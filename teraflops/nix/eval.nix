@@ -1,3 +1,4 @@
+# this file is used by `hive.nix` and `terraform.nix` to work with a given teraflops deploy specified by `flake`
 { flake ? builtins.getFlake (toString "%s") }:
 let
   lib = flake.inputs.nixpkgs.lib;
@@ -17,6 +18,7 @@ let
 
   terraform =
     let
+      # `terraform.json` is a slightly processed version of `terraform show -json` produced by `teraflops` for consumption here
       value = with builtins; lib.optionalAttrs (pathExists ./terraform.json) (fromJSON (readFile ./terraform.json));
     in
     {
@@ -26,11 +28,13 @@ let
 
   module = { options, config, lib, ... }: with lib; {
     options = {
+      # pass directly to colmena
       meta = mkOption {
         type = with types; attrsOf unspecified;
         default = { };
       };
     } // genAttrs [ "check" "data" "locals" "module" "output" "provider" "removed" "resource" "run" "terraform" "variable" ] (value: mkOption {
+      # provide an option for every (useful?) type of top level terraform object
       type = lib.types.deferredModuleWith {
         staticModules = [
           { _module.freeformType = jsonType; }
@@ -46,6 +50,10 @@ let
         options.deployment.targetEnv = mkOption {
           type = with types; nullOr str;
           default = null;
+          description = ''
+            This option specifies the type of the environment in which the
+            machine is to be deployed by `teraflops`.
+          '';
         };
 
         options.deployment.provisionSSHKey = mkOption {
@@ -68,6 +76,7 @@ let
         };
       };
 
+      # inject a ssh private key terraform resource if `provisionSSHKey` is set
       resource = { nodes, lib, ... }: with lib;
         let
           nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
@@ -80,6 +89,10 @@ let
           };
         };
 
+      # `colmena exec` is relatively slow because it needs to do a nix evaluation every time it is run
+      # since `teraflops` has state this can be used to speed up the equivalent operation, `teraflops ssh-for-each`
+      #
+      # inject a terraform output which can be used by the `teraflops` tool for quick access to important data
       output = { nodes, lib, ... }: with lib;
         let
           nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
@@ -112,6 +125,7 @@ let
       }
     ];
 
+    # provide terraform resources as specialArgs so they can be used to alter the structure of a teraflops `config`
     specialArgs = { inherit (terraform) outputs resources; };
   };
 in
