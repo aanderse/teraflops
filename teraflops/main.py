@@ -115,7 +115,7 @@ class App:
     if need_tf_file:
       self.generate_main_tf_json(refresh=False)
 
-    process = subprocess.run(['terraform', 'show', '-json'], stdout=subprocess.PIPE, check=True)
+    process = subprocess.run([self.terraform, 'show', '-json'], stdout=subprocess.PIPE, check=True)
     terraform_data = json.loads(process.stdout)
 
     try:
@@ -224,7 +224,7 @@ class App:
   def query_deployment(self):
     self.generate_main_tf_json(refresh=False)
 
-    process = subprocess.run(['terraform', 'output', '-json', 'teraflops'], capture_output=True)
+    process = subprocess.run([self.terraform, 'output', '-json', 'teraflops'], capture_output=True)
 
     try:
       output = json.loads(process.stdout)
@@ -247,7 +247,7 @@ class App:
     # needs: main.tf.json (needs: eval.nix, hive.nix, terraform.nix)
 
     self.generate_main_tf_json(refresh=True)
-    subprocess.run(['terraform'] + args.passthru, check=True)
+    subprocess.run([self.terraform] + args.passthru, check=True)
 
   def nix(self, args):
     if '--config' in args.passthru:
@@ -259,7 +259,7 @@ class App:
 
   def init(self, args):
     self.generate_main_tf_json(refresh=True)
-    cmd = ['terraform', 'init']
+    cmd = [self.terraform, 'init']
     if args.migrate_state:
       cmd += ['-migrate-state']
     if args.reconfigure:
@@ -311,7 +311,7 @@ class App:
     # apply
     self.generate_main_tf_json(refresh=True)
 
-    cmd = ['terraform', 'apply']
+    cmd = [self.terraform, 'apply']
     if args.confirm:
       cmd += ['-auto-approve']
 
@@ -337,12 +337,12 @@ class App:
 
   def plan(self, args):
     self.generate_main_tf_json(refresh=True)
-    subprocess.run(['terraform', 'plan'], check=True)
+    subprocess.run([self.terraform, 'plan'], check=True)
 
   def apply(self, args):
     self.generate_main_tf_json(refresh=True)
 
-    cmd = ['terraform', 'apply']
+    cmd = [self.terraform, 'apply']
     if args.confirm:
       cmd += ['-auto-approve']
 
@@ -388,7 +388,7 @@ class App:
   def destroy(self, args):
     self.generate_main_tf_json(refresh=True)
 
-    cmd = ['terraform', 'apply', '-destroy']
+    cmd = [self.terraform, 'apply', '-destroy']
     if args.confirm:
       cmd += ['-auto-approve']
 
@@ -745,6 +745,20 @@ class App:
       # if no subcommand is provided, print help
       parser.print_help()
 
+  def check(self):
+    # run various checks to ensure we're in a good state to proceed
+    if shutil.which('terraform'):
+      self.terraform = 'terraform'
+    elif shutil.which('tofu'):
+      self.terraform = 'tofu'
+    else:
+      logging.error('terraform doesn\'t appear to be installed')
+      sys.exit(1)
+
+    if not shutil.which('colmena'):
+      logging.error('colmena doesn\'t appear to be installed')
+      sys.exit(1)
+
 def main():
   try:
     handler = logging.StreamHandler()
@@ -755,6 +769,7 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix='teraflops.', delete=True) as tempdir:
       app = App(tempdir)
+      app.check()
       app.run()
   except KeyboardInterrupt:
     try:
