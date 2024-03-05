@@ -740,7 +740,7 @@ class App:
       # if no subcommand is provided, print help
       parser.print_help()
 
-  def check(self):
+  def check_version(self):
     # run various checks to ensure we're in a good state to proceed
     if shutil.which('terraform'):
       self.terraform = 'terraform'
@@ -764,7 +764,7 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix='teraflops.', delete=True) as tempdir:
       app = App(tempdir)
-      app.check()
+      app.check_version()
       app.run()
   except KeyboardInterrupt:
     try:
