@@ -153,7 +153,6 @@ class App:
         private_key = outputs['teraflops']['value']['privateKey']
       except KeyError:
         private_key = None
-        pass
 
       if private_key is not None:
         ssh_config(private_key, self.tempdir)
@@ -236,7 +235,7 @@ class App:
       try:
         private_key = output['privateKey']
       except KeyError:
-        pass
+        private_key = None
 
       if private_key is not None:
         ssh_config(private_key, self.tempdir)
