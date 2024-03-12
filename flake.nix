@@ -13,6 +13,7 @@
       in
       {
         packages.default = pkgs.python312.pkgs.callPackage ./nix/teraflops.nix {};
+        packages.docs = import ./docs { inherit pkgs; };
 
         devShells.default = with pkgs;
           mkShell {
