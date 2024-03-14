@@ -46,7 +46,6 @@ let
     config = {
       _module.freeformType = with types; attrsOf deferredModule;
 
-      # NOTE: keep in sync with docs/deployment.nix
       defaults = { name, lib, ... }: with lib; {
         options.deployment.targetEnv = mkOption {
           type = with types; nullOr str;
