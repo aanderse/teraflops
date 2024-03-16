@@ -220,8 +220,9 @@ class App:
       shutil.copy('main.tf.json', tf_cache_file)
       os.chmod(tf_cache_file, 0o664)
 
-  def query_deployment(self):
-    self.generate_main_tf_json(refresh=False)
+  def query_deployment(self, need_tf_file=True):
+    if need_tf_file:
+      self.generate_main_tf_json(refresh=False)
 
     process = subprocess.run([self.terraform, 'output', '-json', 'teraflops'], capture_output=True)
 
@@ -313,6 +314,35 @@ class App:
     subprocess.run(cmd, check=True)
 
     self.generate_terraform_json(need_tf_file=False)
+
+
+    # make sure all relevant nodes are available
+    nodes = self.query_deployment(need_tf_file=False)
+
+    if not (args.on is None):
+      node_filter = NodeFilter(args.on)
+      nodes = node_filter.filter(nodes)
+
+    length = len(max(nodes.keys(), key = len)) if nodes else len('ERROR')
+
+    ssh_args = ['-o', 'ConnectTimeout=10'] # see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
+
+    async def wait_for_node(name, node):
+      # TODO: mimic colmena spinners to let user know that we're waiting for nodes to become available
+      while True:
+        proc = await asyncio.create_subprocess_exec(*ssh(node, ['cat', '/proc/sys/kernel/random/boot_id'], ssh_args), stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+
+        if await proc.wait() == 0:
+          break
+
+        await asyncio.sleep(2)
+
+    async def run():
+      tasks = [wait_for_node(name, node) for name, node in nodes.items()]
+      return await asyncio.gather(*tasks)
+
+    asyncio.run(run())
+
 
     # activate
     cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=False), 'apply']
