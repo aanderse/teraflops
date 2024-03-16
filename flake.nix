@@ -25,6 +25,7 @@
       modules = {
         digitalocean = import ./nix/digitalocean;
         hcloud = import ./nix/hcloud;
+        linode = import ./nix/linode;
         lxd = import ./nix/lxd;
         virtualbox = import ./nix/virtualbox;
       };
