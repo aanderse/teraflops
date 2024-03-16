@@ -134,14 +134,13 @@ in
         terminal_output serial
       '';
 
-      # TODO: linode provides some useful data that could be used to set 'fileSystems' and 'swapDevices'
       fileSystems."/" = {
         fsType = "ext4";
-        device = "/dev/sda";
+        label = "linode-root";
       };
 
       swapDevices = [
-        { device = "/dev/sdb"; }
+        { label = "linode-swap"; }
       ];
 
       services.openssh.enable = true;
