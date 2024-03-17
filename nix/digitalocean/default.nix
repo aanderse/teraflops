@@ -214,6 +214,10 @@ in
         source = "digitalocean/digitalocean";
         version = ">= 2.32.0";
       };
+      ssh = {
+        source = "loafoe/ssh";
+        version = ">= 2.7.0";
+      };
     };
   };
 
