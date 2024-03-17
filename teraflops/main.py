@@ -306,7 +306,6 @@ class App:
     subprocess.run(['colmena', '--config', self.generate_hive_nix(full_eval=True)] + args.passthru, check=True)
 
   def init(self, args):
-    self.generate_main_tf_json(refresh=True)
     cmd = [self.terraform, 'init']
     if args.migrate_state:
       cmd += ['-migrate-state']
@@ -314,7 +313,11 @@ class App:
       cmd += ['-reconfigure']
     if args.upgrade:
       cmd += ['-upgrade']
-    subprocess.run(cmd, check=True)
+
+    with tempfile.NamedTemporaryFile(mode='w', dir=os.getcwd(), prefix='teraflops', suffix='.tf.json') as fp:
+      # generate a minimal .tf.json file which can be used to run 'terraform init'
+      subprocess.run(['nix-instantiate', '--eval', '--json', '--strict', '--read-write-mode', self.generate_bootstrap_nix()], stdout=fp, check=True)
+      subprocess.run(cmd, check=True)
 
   def repl(self, args):
     self.generate_hive_nix(full_eval=True)
