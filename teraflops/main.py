@@ -759,9 +759,9 @@ class App:
     repl_parser.set_defaults(func=self.repl)
 
     # subparser for the 'eval' command
-    eval_parser = subparsers.add_parser('eval', help='')
+    eval_parser = subparsers.add_parser('eval', help='evaluate an expression using the complete configuration')
     eval_parser.set_defaults(func=self.eval)
-    eval_parser.add_argument('expr', type=str, help='evaluate an expression using the complete configuration')
+    eval_parser.add_argument('expr', type=str, help='the nix expression')
 
     # TODO: drop this
     # subparser for the 'eval_jobs' command
@@ -808,14 +808,14 @@ class App:
     check_parser.set_defaults(func=self.check)
 
     # subparser for the 'set-args' command
-    set_args_parser = subparsers.add_parser('set-args', help='...')
+    set_args_parser = subparsers.add_parser('set-args', help='persistently sets arguments to be passed to the deployment specification')
     set_args_parser.set_defaults(func=self.set_args)
-    set_args_parser.add_argument('--arg', nargs=2, action='append', metavar=('name', 'value'), help='...')
-    set_args_parser.add_argument('--argstr', nargs=2, action='append', metavar=('name', 'value'), help='...')
-    set_args_parser.add_argument('--unset', action='append', metavar='name', help='...')
+    set_args_parser.add_argument('--arg', nargs=2, action='append', metavar=('name', 'value'), help='set the function argument name to value, where the latter is an arbitrary nix expression')
+    set_args_parser.add_argument('--argstr', nargs=2, action='append', metavar=('name', 'value'), help='like --arg, but the value is a literal string rather than a nix expression')
+    set_args_parser.add_argument('--unset', action='append', metavar='name', help='remove a previously set function argument')
 
     # subparser for the 'show-args' command
-    show_args_parser = subparsers.add_parser('show-args', help='', aliases=['show-arguments'])
+    show_args_parser = subparsers.add_parser('show-args', aliases=['show-arguments'], help='print the arguments to be passed to the deployment')
     show_args_parser.set_defaults(func=self.show_args)
     show_args_parser.add_argument('--json', action='store_true')
 
