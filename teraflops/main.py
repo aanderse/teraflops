@@ -111,6 +111,37 @@ class App:
   def __init__(self, tempdir):
     self.tempdir = tempdir
 
+  def generate_arguments_json(self):
+    tf_data_dir = os.getenv('TF_DATA_DIR', '.terraform')
+    tf_cache_file = os.path.join(tf_data_dir, 'teraflops.json')
+
+    # if we already have a cached .tf.json file don't bother generating one
+    if self.config == '.' and os.path.isfile(tf_cache_file):
+      shutil.copy(tf_cache_file, 'main.tf.json')
+
+      process = subprocess.run([self.terraform, 'show', '-json'], stdout=subprocess.PIPE, check=True)
+      data = json.loads(process.stdout)
+
+      os.remove('main.tf.json')
+    else:
+      with tempfile.NamedTemporaryFile(mode='w', dir=os.getcwd(), prefix='teraflops', suffix='.tf.json') as fp:
+        # generate a minimal .tf.json file which can be used to run 'terraform show -json'
+        subprocess.run(['nix-instantiate', '--eval', '--json', '--strict', '--read-write-mode', self.generate_bootstrap_nix()], stdout=fp, check=True)
+
+        process = subprocess.run([self.terraform, 'show', '-json'], stdout=subprocess.PIPE, check=True)
+        data = json.loads(process.stdout)
+
+    try:
+      resources = data['values']['root_module']['resources']
+      for resource in resources:
+        if resource['address'] == 'terraform_data.teraflops-arguments':
+          self.teraflops_arguments = resource['values']['input']
+    except KeyError:
+      self.teraflops_arguments = dict()
+
+    with open(os.path.join(self.tempdir, 'arguments.json'), 'w') as fp:
+      fp.write(json.dumps(self.teraflops_arguments, indent=2, sort_keys=True))
+
   def generate_terraform_json(self, need_tf_file=True):
     if need_tf_file:
       self.generate_main_tf_json(refresh=False)
@@ -159,6 +190,19 @@ class App:
 
     return os.path.join(self.tempdir, 'terraform.json')
 
+  def generate_bootstrap_nix(self):
+    process = subprocess.run(['nix', '--extra-experimental-features', 'nix-command', 'flake', 'metadata', '--json', self.config], stdout=subprocess.PIPE, check=True)
+    metadata = json.loads(process.stdout)
+
+    flake = metadata['resolvedUrl']
+
+    bootstrap_nix = files('teraflops.nix').joinpath('bootstrap.nix').read_text()
+
+    with open(os.path.join(self.tempdir, 'bootstrap.nix'), 'w') as f:
+      f.write(bootstrap_nix % flake)
+
+    return os.path.join(self.tempdir, 'bootstrap.nix')
+
   def generate_eval_nix(self):
     process = subprocess.run(['nix', '--extra-experimental-features', 'nix-command', 'flake', 'metadata', '--json', self.config], stdout=subprocess.PIPE, check=True)
     metadata = json.loads(process.stdout)
@@ -198,12 +242,19 @@ class App:
     return os.path.join(self.tempdir, 'repl.nix')
 
   # NOTE: only cache/use cached main.tf.json if no --config is specified
-  def generate_main_tf_json(self, refresh: bool):
+  def generate_main_tf_json(self, refresh: bool, rewrite_args=False):
     tf_data_dir = os.getenv('TF_DATA_DIR', '.terraform')
     tf_cache_file = os.path.join(tf_data_dir, 'teraflops.json')
 
     if not refresh and self.config == '.' and os.path.isfile(tf_cache_file):
-      shutil.copy(tf_cache_file, 'main.tf.json')
+      if rewrite_args:
+        with open(tf_cache_file, 'r') as fp:
+          data = json.load(fp)
+        data['resource']['terraform_data']['teraflops-arguments']['input'] = self.teraflops_arguments
+        with open('main.tf.json', 'w') as fp:
+          json.dump(data, fp, indent=2)
+      else:
+        shutil.copy(tf_cache_file, 'main.tf.json')
       return
 
     self.generate_hive_nix(full_eval=False)
@@ -424,10 +475,18 @@ class App:
       data = json.load(fp)
 
     # filter out internal state
+
     try:
       del data['resources']['tls_private_key']['teraflops']
       if not data['resources']['tls_private_key']:
         del data['resources']['tls_private_key']
+    except KeyError:
+      pass
+
+    try:
+      del data['resources']['terraform_data']['teraflops-arguments']
+      if not data['resources']['terraform_data']:
+        del data['resources']['terraform_data']
     except KeyError:
       pass
 
@@ -452,6 +511,37 @@ class App:
       return await asyncio.gather(*tasks)
 
     asyncio.run(run())
+
+  def set_args(self, args):
+    if args.arg:
+      for (name, value) in args.arg:
+        new_value = json.loads(subprocess.check_output(['nix', '--extra-experimental-features', 'nix-command', 'eval', '--json', '--expr', '%s' % value]))
+        self.teraflops_arguments[name] = new_value
+
+    if args.argstr:
+      for (name, value) in args.argstr:
+        self.teraflops_arguments[name] = value
+
+    if args.unset:
+      for name in args.unset:
+        if name in self.teraflops_arguments: del self.teraflops_arguments[name]
+
+    with open(os.path.join(self.tempdir, 'arguments.json'), 'w') as fp:
+      fp.write(json.dumps(self.teraflops_arguments, indent=2, sort_keys=True))
+
+    self.generate_main_tf_json(refresh=False, rewrite_args=True)
+
+    subprocess.run(['terraform', 'apply', '-target=terraform_data.teraflops-arguments', '-auto-approve'], stdout=subprocess.DEVNULL, check=True)
+
+  def show_args(self, args):
+    if args.json:
+      print(json.dumps(self.teraflops_arguments, indent=2, sort_keys=True))
+    else:
+      for k, v in self.teraflops_arguments.items():
+        if type(v) == str:
+          print(f'{k} = "{v}"')
+        else:
+          print(f'{k} = {v}')
 
   def ssh(self, args):
     nodes = self.query_deployment()
@@ -714,6 +804,18 @@ class App:
     check_parser = subparsers.add_parser('check', help='attempt to connect to each node via SSH and print the results of the uptime command.')
     check_parser.set_defaults(func=self.check)
 
+    # subparser for the 'set-args' command
+    set_args_parser = subparsers.add_parser('set-args', help='...')
+    set_args_parser.set_defaults(func=self.set_args)
+    set_args_parser.add_argument('--arg', nargs=2, action='append', metavar=('name', 'value'), help='...')
+    set_args_parser.add_argument('--argstr', nargs=2, action='append', metavar=('name', 'value'), help='...')
+    set_args_parser.add_argument('--unset', action='append', metavar='name', help='...')
+
+    # subparser for the 'show-args' command
+    show_args_parser = subparsers.add_parser('show-args', help='', aliases=['show-arguments'])
+    show_args_parser.set_defaults(func=self.show_args)
+    show_args_parser.add_argument('--json', action='store_true')
+
     # subparser for the 'ssh' command
     ssh_parser = subparsers.add_parser('ssh', help='login on the specified machine via SSH')
     ssh_parser.set_defaults(func=self.ssh)
@@ -757,6 +859,10 @@ class App:
       try:
         self.config = args.config
         self.show_trace = args.show_trace
+
+        # 'init' is the only function which doesn't require arguments... all it does is prep the directory
+        if args.func != self.init:
+          self.generate_arguments_json()
 
         self.generate_eval_nix()
 

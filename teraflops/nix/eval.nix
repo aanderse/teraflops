@@ -16,6 +16,9 @@ let
     };
   in valueType;
 
+  # arguments that have been set with the 'set-args' command
+  arguments = with builtins; fromJSON (readFile ./arguments.json);
+
   terraform =
     let
       # `terraform.json` is a slightly processed version of `terraform show -json` produced by `teraflops` for consumption here
@@ -76,16 +79,21 @@ let
         };
       };
 
-      # inject a ssh private key terraform resource if `provisionSSHKey` is set
       resource = { nodes, lib, ... }: with lib;
         let
           nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
         in
         {
+          # inject a ssh private key terraform resource if `provisionSSHKey` is set
           tls_private_key = mkIf (nodes' != {}) {
             teraflops = {
               algorithm = "ED25519";
             };
+          };
+
+          # store teraflops arguments (see set-args and show-args commands) in a terraform_data resource
+          terraform_data = mkIf (arguments != { }) {
+            teraflops-arguments.input = arguments;
           };
         };
 
@@ -126,7 +134,7 @@ let
     ];
 
     # provide terraform resources as specialArgs so they can be used to alter the structure of a teraflops `config`
-    specialArgs = { inherit (terraform) outputs resources; };
+    specialArgs = { inherit (terraform) outputs resources; } // arguments;
   };
 in
   eval
