@@ -8,9 +8,10 @@ let
 in
   colmena.introspect ({ nodes, pkgs, lib, ... }:
   let
+    arguments = with builtins; fromJSON (readFile ./arguments.json);
     terraform = with builtins; fromJSON (readFile ./terraform.json);
   in
   {
     inherit nodes pkgs lib;
     inherit (terraform) outputs resources;
-  })
+  } // arguments)

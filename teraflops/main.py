@@ -336,7 +336,7 @@ class App:
     if args.show_trace:
       cmd += ['--show-trace']
     # TODO: make `terraform` variable inaccessible from within expression
-    cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f { inherit nodes pkgs lib; inherit (terraform) outputs resources; }' % (os.path.join(self.tempdir, 'terraform.json'), args.expr)]
+    cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); arguments = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f ({ inherit nodes pkgs lib; inherit (terraform) outputs resources; } // arguments)' % (os.path.join(self.tempdir, 'terraform.json'), os.path.join(self.tempdir, 'arguments.json'), args.expr)]
     subprocess.run(cmd, check=True)
 
   def eval_jobs(self, args):
