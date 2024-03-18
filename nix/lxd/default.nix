@@ -22,22 +22,6 @@ in
             '';
           };
         };
-
-        config = {
-          config = {
-            "boot.autostart" = mkDefault true;
-            "security.privileged" = mkDefault true;
-          };
-
-          file = mkIf config.deployment.provisionSSHKey [
-            {
-              content = tf.ref "tls_private_key.teraflops.public_key_openssh";
-              target_path = "/root/.ssh/authorized_keys";
-              mode = "0600";
-              create_directories = true;
-            }
-          ];
-        };
       });
       default = null;
       description = ''
@@ -46,7 +30,6 @@ in
     };
 
     config = mkIf (config.deployment.targetEnv == "lxd") {
-      deployment.lxd = {};
       deployment.targetHost = if resources != null
         then resources.lxd_instance.${config.deployment.lxd.name}.ipv6_address
         else tf.ref "lxd_instance.${config.deployment.lxd.name}.ipv6_address";
@@ -56,6 +39,23 @@ in
       users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
         resources.tls_private_key.teraflops.public_key_openssh
       ];
+
+      # terraform: resource.lxd_instance
+      deployment.lxd = {
+        config = {
+          "boot.autostart" = mkDefault true;
+          "security.privileged" = mkDefault true;
+        };
+
+        file = mkIf config.deployment.provisionSSHKey [
+          {
+            content = tf.ref "tls_private_key.teraflops.public_key_openssh";
+            target_path = "/root/.ssh/authorized_keys";
+            mode = "0600";
+            create_directories = true;
+          }
+        ];
+      };
     };
   };
 

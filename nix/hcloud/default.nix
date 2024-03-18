@@ -24,36 +24,6 @@ in
             '';
           };
         };
-
-        config = {
-          image = "ubuntu-22.04";
-
-          user_data = mkIf config.deployment.provisionSSHKey ''
-            #cloud-config
-            users:
-              - name: root
-                lock_passwd: true
-                ssh_authorized_keys:
-                  - ''${trimspace(tls_private_key.teraflops.public_key_openssh)}
-            chpasswd:
-              expire: false
-          '';
-
-          connection = {
-            type = "ssh";
-            user = config.deployment.targetUser;
-            host = config.deployment.targetHost;
-            port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
-            private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
-          };
-
-          provisioner.remote-exec = {
-            inline = [
-              "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
-              "shutdown -r +0"
-            ];
-          };
-        };
       });
       default = null;
       description = ''
@@ -62,7 +32,6 @@ in
     };
 
     config = mkIf (config.deployment.targetEnv == "hcloud") {
-      deployment.hcloud = {};
       deployment.targetHost = if resources != null
         then resources.hcloud_server.${name}.ipv4_address
         else tf.ref "hcloud_server.${name}.ipv4_address";
@@ -84,6 +53,37 @@ in
       users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
         resources.tls_private_key.teraflops.public_key_openssh
       ];
+
+      # terraform: resource.hcloud_server
+      deployment.hcloud = {
+        image = "ubuntu-22.04";
+
+        user_data = mkIf config.deployment.provisionSSHKey ''
+          #cloud-config
+          users:
+            - name: root
+              lock_passwd: true
+              ssh_authorized_keys:
+                - ''${trimspace(tls_private_key.teraflops.public_key_openssh)}
+          chpasswd:
+            expire: false
+        '';
+
+        connection = {
+          type = "ssh";
+          user = config.deployment.targetUser;
+          host = config.deployment.targetHost;
+          port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
+          private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
+        };
+
+        provisioner.remote-exec = {
+          inline = [
+            "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=hetznercloud NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
+            "shutdown -r +0"
+          ];
+        };
+      };
     };
   };
 

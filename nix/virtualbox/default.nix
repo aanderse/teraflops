@@ -14,37 +14,6 @@ in
             description = "The name of the virtual machine.";
           };
         };
-
-        config = {
-          image =
-            let
-              ova = (import "${pkgs.path}/nixos/lib/eval-config.nix" {
-                modules = [ ./virtualbox-image-nixops.nix ];
-              }).config.system.build.virtualBoxOVA;
-            in
-              "${ova}/nixos-${config.system.nixos.version}-${config.nixpkgs.system}.ova";
-
-          # https://www.roksblog.de/terraform-virtualbox-provider-terrafarm/
-          network_adapter = {
-            type = "hostonly";
-            host_interface = "vboxnet0";
-          };
-
-          provisioner = mkIf config.deployment.provisionSSHKey {
-            local-exec = {
-              command = ''
-                VBoxManage guestproperty set ''${self.id} /VirtualBox/GuestInfo/Charon/ClientPublicKey "''${trimspace(tls_private_key.teraflops.public_key_openssh)}"
-              '';
-            };
-          };
-
-          lifecycle = {
-            ignore_changes = [
-              # image depends on pkgs which will change
-              "image"
-            ];
-          };
-        };
       });
       default = null;
       description = ''
@@ -53,7 +22,6 @@ in
     };
 
     config = mkIf (config.deployment.targetEnv == "virtualbox") {
-      deployment.virtualbox = {};
       deployment.targetHost = if resources != null
         then (head resources.virtualbox_vm.${name}.network_adapter).ipv4_address
         else tf.ref "element(virtualbox_vm.${name}.network_adapter, 0).ipv4_address";
@@ -72,6 +40,38 @@ in
       # may get a different IP address if dhcpcd is restarted.  So don't
       # restart dhcpcd.
       systemd.services.dhcpcd.restartIfChanged = false;
+
+      # terraform: resource.virtualbox_vm
+      deployment.virtualbox = {
+        image =
+          let
+            ova = (import "${pkgs.path}/nixos/lib/eval-config.nix" {
+              modules = [ ./virtualbox-image-nixops.nix ];
+            }).config.system.build.virtualBoxOVA;
+          in
+            "${ova}/nixos-${config.system.nixos.version}-${config.nixpkgs.system}.ova";
+
+        # https://www.roksblog.de/terraform-virtualbox-provider-terrafarm/
+        network_adapter = {
+          type = "hostonly";
+          host_interface = "vboxnet0";
+        };
+
+        provisioner = mkIf config.deployment.provisionSSHKey {
+          local-exec = {
+            command = ''
+              VBoxManage guestproperty set ''${self.id} /VirtualBox/GuestInfo/Charon/ClientPublicKey "''${trimspace(tls_private_key.teraflops.public_key_openssh)}"
+            '';
+          };
+        };
+
+        lifecycle = {
+          ignore_changes = [
+            # image depends on pkgs which will change
+            "image"
+          ];
+        };
+      };
     };
   };
 

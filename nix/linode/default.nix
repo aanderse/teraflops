@@ -37,30 +37,6 @@ in
             '';
           };
         };
-
-        config = {
-          image = "linode/ubuntu22.04";
-
-          authorized_keys = optionals config.deployment.provisionSSHKey [
-            (tf.ref "trimspace(tls_private_key.teraflops.public_key_openssh)")
-          ];
-
-          connection = {
-            type = "ssh";
-            user = config.deployment.targetUser;
-            host = config.deployment.targetHost;
-            port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
-            private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
-          };
-
-          provisioner.remote-exec = {
-            inline = [
-              "hostnamectl hostname nixos" # ensure 'networking.hostName' isn't "localhost"
-              "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
-              "shutdown -r +0"
-            ];
-          };
-        };
       });
       default = null;
       description = ''
@@ -121,7 +97,6 @@ in
     };
 
     config = mkIf (config.deployment.targetEnv == "linode") {
-      deployment.linode = {};
       deployment.targetHost = if resources != null
         then resources.linode_instance.${name}.ip_address
         else tf.ref "linode_instance.${name}.ip_address";
@@ -148,6 +123,31 @@ in
       users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
         resources.tls_private_key.teraflops.public_key_openssh
       ];
+
+      # terraform: resource.linode_instance
+      deployment.linode = {
+        image = "linode/ubuntu22.04";
+
+        authorized_keys = optionals config.deployment.provisionSSHKey [
+          (tf.ref "trimspace(tls_private_key.teraflops.public_key_openssh)")
+        ];
+
+        connection = {
+          type = "ssh";
+          user = config.deployment.targetUser;
+          host = config.deployment.targetHost;
+          port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
+          private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
+        };
+
+        provisioner.remote-exec = {
+          inline = [
+            "hostnamectl hostname nixos" # ensure 'networking.hostName' isn't "localhost"
+            "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
+            "shutdown -r +0"
+          ];
+        };
+      };
     };
   };
 

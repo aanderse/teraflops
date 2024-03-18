@@ -47,33 +47,6 @@ in
             '';
           };
         };
-
-        config = {
-          # NOTE: droplets seem to insist on forcing password changes
-          # if you use the usual cloud-init config for user provisioning
-          user_data = mkIf config.deployment.provisionSSHKey ''
-            #cloud-config
-            runcmd:
-              - chage -I -1 -m 0 -M 99999 -E -1 -d -1 root
-              - mkdir -m 0700 /root/.ssh
-              - echo "''${trimspace(tls_private_key.teraflops.public_key_openssh)}" > /root/.ssh/authorized_keys
-          '';
-
-          connection = {
-            type = "ssh";
-            user = config.deployment.targetUser;
-            host = config.deployment.targetHost;
-            port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
-            private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
-          };
-
-          provisioner.remote-exec = {
-            inline = [
-              "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=digitalocean NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
-              "shutdown -r +0"
-            ];
-          };
-        };
       });
       default = null;
       description = ''
@@ -156,7 +129,6 @@ in
             message = "you must set a label on ${name}.fileSystems.${mountPoint}";
           }) config.fileSystems;
 
-          deployment.digitalocean = {};
           deployment.targetHost =
             let
               attribute = if config.deployment.digitalocean.ipv6 then "ipv6_address" else "ipv4_address";
@@ -205,6 +177,34 @@ in
           users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
             resources.tls_private_key.teraflops.public_key_openssh
           ];
+
+          # terraform: resource.digitalocean_droplet
+          deployment.digitalocean = {
+            # NOTE: droplets seem to insist on forcing password changes
+            # if you use the usual cloud-init config for user provisioning
+            user_data = mkIf config.deployment.provisionSSHKey ''
+              #cloud-config
+              runcmd:
+                - chage -I -1 -m 0 -M 99999 -E -1 -d -1 root
+                - mkdir -m 0700 /root/.ssh
+                - echo "''${trimspace(tls_private_key.teraflops.public_key_openssh)}" > /root/.ssh/authorized_keys
+            '';
+
+            connection = {
+              type = "ssh";
+              user = config.deployment.targetUser;
+              host = config.deployment.targetHost;
+              port = mkIf (config.deployment.targetPort != null) config.deployment.targetPort;
+              private_key = mkIf config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
+            };
+
+            provisioner.remote-exec = {
+              inline = [
+                "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=digitalocean NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
+                "shutdown -r +0"
+              ];
+            };
+          };
         };
   };
 
