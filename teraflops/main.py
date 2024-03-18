@@ -110,6 +110,7 @@ def ssh(node, command, ssh_args=None):
 class App:
   def __init__(self, tempdir):
     self.tempdir = tempdir
+    self.teraflops_arguments = dict()
 
   def generate_arguments_json(self):
     tf_data_dir = os.getenv('TF_DATA_DIR', '.terraform')
@@ -137,7 +138,7 @@ class App:
         if resource['address'] == 'terraform_data.teraflops-arguments':
           self.teraflops_arguments = resource['values']['input']
     except KeyError:
-      self.teraflops_arguments = dict()
+      pass
 
     with open(os.path.join(self.tempdir, 'arguments.json'), 'w') as fp:
       fp.write(json.dumps(self.teraflops_arguments, indent=2, sort_keys=True))
