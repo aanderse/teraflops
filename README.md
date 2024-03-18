@@ -4,7 +4,7 @@
 
 `teraflops` aims to provide an integrated experience for deployment workflows which involve both [terraform](https://github.com/hashicorp/terraform) and [NixOS](https://github.com/NixOS/nixos) - similar to that of [NixOps](https://github.com/NixOS/nixops). `teraflops` uses the excellent [colmena](https://github.com/zhaofengli/colmena) deployment tool to do most of the heavy lifting, so the following example should look somewhat familiar if you have ever used `colmena`.
 
-```
+```nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -48,7 +48,7 @@
 
 The `teraflops` tool has a number of high level commands that often resemble the `NixOps` CLI.
 
-```
+```sh
 # prepare your terraform state in the current working directory
 teraflops init
 
@@ -66,7 +66,7 @@ teraflops eval '{ nodes, ... }: builtins.attrNames nodes'
 
 Additionally there are two low level subcommands which get out of your way and let you use the tools you're used to: `terraform` and `colmena`.
 
-```
+```sh
 # 'teraflops tf' is a direct passthrough to terraform
 teraflops tf init
 teraflops tf apply
@@ -80,7 +80,7 @@ teraflops nix apply --reboot
 
 `terapflops` implements the `set-args` command from [NixOps](https://github.com/NixOS/nixops/blob/master/doc/overview.rst#network-arguments). Referencing the example from `NixOps`:
 
-```
+```nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -103,7 +103,7 @@ teraflops nix apply --reboot
 
 You can pass deployment arguments using the `set-args` command. For example, if we want to set the `maintenance` argument to `true` in the previous example, you can run:
 
-```
+```sh
 teraflops set-args --arg maintenance true
 ```
 
