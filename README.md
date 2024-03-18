@@ -76,6 +76,47 @@ teraflops nix repl
 teraflops nix apply --reboot
 ```
 
+## Deployment arguments
+
+`terapflops` implements the `set-args` command from [NixOps](https://github.com/NixOS/nixops/blob/master/doc/overview.rst#network-arguments). Referencing the example from `NixOps`:
+
+```
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    teraflops.url = "github:aanderse/teraflops";
+  };
+
+  outputs = { nixpkgs, teraflops, ... }: {
+    teraflops =
+      { maintenance ? false }:
+      {
+        machine =
+          { config, pkgs, ... }:
+          { services.httpd.enable = maintenance;
+            ...
+          };
+      };
+  };
+}
+```
+
+You can pass deployment arguments using the `set-args` command. For example, if we want to set the `maintenance` argument to `true` in the previous example, you can run:
+
+```
+teraflops set-args --arg maintenance true
+```
+
+## Special arguments
+
+In addition to the regular `nix` module inputs and those defined by calls to the `set-args` command the following arguments are available to `teraflops` modules:
+
+- `outputs`: The fully evaluated [terraform output values](https://developer.hashicorp.com/terraform/language/values/outputs). Generally these aren't as useful in `teraflops` as they are in `terraform` because the `teraflops eval` command has full access to a `resources` argument which accounts for _most_ use cases in `terraform`.
+- `resources`: The fully evaluated `terraform` resource set, which includes `resource`, `data`, `module`, etc... objects representing the full state of your deployment.
+- `tf`: A minor helper which is most useful for the `tf.ref` function it contains which is used to create `terraform` references, just like in [terranix](https://terranix.org/news/2023-05-24_release-2.6.0.html).
+
+_NOTE:_ Both `outputs` and `resources` will be `null` when a `teraflops` module is evaluated for the purpose of generating `terraform` code in order to avoid recursion.
+
 ## Implementation
 
 A very quick `python` script I hacked together which isn't great. Don't look at the code yet... really 😅
