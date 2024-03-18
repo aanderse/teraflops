@@ -125,4 +125,5 @@ A very quick `python` script I hacked together which isn't great. Don't look at 
 
 - [colmena](https://github.com/zhaofengli/colmena) - used by `teraflops` to manage deployments
 - [NixOps](https://github.com/NixOS/nixops) - inspiration for `teraflops`
+- [nixos-infect](https://github.com/elitak/nixos-infect) - used by `teraflops` for integration with various cloud providers
 - [terranix](https://github.com/terranix/terranix) - inspiration for `teraflops`
