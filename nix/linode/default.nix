@@ -3,7 +3,7 @@ let
   nodes' = lib.filterAttrs (_: node: node.targetEnv == "linode") (outputs.teraflops.nodes or {});
 in
 {
-  defaults = { modulesPath, name, config, pkgs, lib, ... }: with lib; {
+  defaults = { name, config, pkgs, lib, ... }: with lib; {
     options.deployment.linode = mkOption {
       type = with types; nullOr (submodule {
         freeformType = (pkgs.formats.json {}).type;
@@ -101,24 +101,15 @@ in
         then resources.linode_instance.${name}.ip_address
         else tf.ref "linode_instance.${name}.ip_address";
 
-      boot.kernelParams = [ "console=ttyS0,19200n8" ];
-      boot.loader.grub.device = "nodev";
-      boot.loader.grub.extraConfig = ''
-        serial --speed=19200 --unit=0 --word=8 --parity=no --stop=1;
-        terminal_input serial;
-        terminal_output serial
-      '';
-
       fileSystems."/" = {
         fsType = "ext4";
         label = "linode-root";
+        device = mkOverride 51 "/dev/disk/by-label/linode-root";
       };
 
       swapDevices = [
         { label = "linode-swap"; }
       ];
-
-      services.openssh.enable = true;
 
       users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
         resources.tls_private_key.teraflops.public_key_openssh
@@ -171,5 +162,5 @@ in
       linode_volume = data;
     };
 } // lib.mapAttrs (_: node: { modulesPath, ... }: {
-  imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];
+  imports = [ "${modulesPath}/virtualisation/linode-config.nix" ];
 }) nodes'
