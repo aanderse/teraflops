@@ -251,7 +251,13 @@ class App:
       if rewrite_args:
         with open(tf_cache_file, 'r') as fp:
           data = json.load(fp)
+
+        data.setdefault('resource', dict())
+        data['resource'].setdefault('terraform_data', dict())
+        data['resource']['terraform_data'].setdefault('teraflops-arguments', dict())
+        data['resource']['terraform_data']['teraflops-arguments'].setdefault('input', dict())
         data['resource']['terraform_data']['teraflops-arguments']['input'] = self.teraflops_arguments
+
         with open('main.tf.json', 'w') as fp:
           json.dump(data, fp, indent=2)
       else:
