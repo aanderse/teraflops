@@ -79,6 +79,15 @@ let
         };
       };
 
+      terraform = {
+        # TODO: keep this in sync with bootstrap.nix
+        required_providers = {
+          tls = {
+            version = ">= 4.0.4";
+          };
+        };
+      };
+
       resource = { nodes, lib, ... }: with lib;
         let
           nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;

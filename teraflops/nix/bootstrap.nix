@@ -38,6 +38,16 @@ let
 in
 {
   terraform = (lib.evalModules {
-    modules = [ { _module.freeformType = jsonType; } ] ++ (map (i: let expr = if builtins.isFunction i then i (dummyArgs i) else i; in expr.terraform or { }) imports);
+    modules = [
+      { _module.freeformType = jsonType; }
+      {
+        # TODO: keep this in sync with eval.nix
+        required_providers = {
+          tls = {
+            version = ">= 4.0.4";
+          };
+        };
+      }
+    ] ++ (map (i: let expr = if builtins.isFunction i then i (dummyArgs i) else i; in expr.terraform or { }) imports);
   }).config;
 }
