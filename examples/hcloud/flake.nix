@@ -22,7 +22,7 @@
           packages = [
             colmena
             jq
-            (terraform.withPlugins (p: [ p.hcloud p.tls ]))
+            (terraform.withPlugins (p: [ p.hcloud p.ssh p.tls ]))
             teraflops.packages.${system}.default
           ];
         };

@@ -3,7 +3,11 @@ let
   nodes' = lib.filterAttrs (_: node: node.targetEnv == "hcloud") (outputs.teraflops.nodes or {});
 in
 {
-  defaults = { modulesPath, name, config, pkgs, lib, ... }: with lib; {
+  defaults = { name, config, pkgs, lib, ... }: with lib;
+  let
+    remoteCfg = builtins.fromJSON resources.ssh_resource.${name}.result;
+  in
+  {
     options.deployment.hcloud = mkOption {
       type = with types; nullOr (submodule {
         freeformType = (pkgs.formats.json {}).type;
@@ -36,13 +40,20 @@ in
         then resources.hcloud_server.${name}.ipv4_address
         else tf.ref "hcloud_server.${name}.ipv4_address";
 
-      boot.loader.grub.device = "/dev/sda";
+      boot.loader.grub = remoteCfg.boot.loader.grub or {
+        device = "/dev/sda";
+      };
       boot.initrd.kernelModules = [ "nvme" ];
 
-      fileSystems."/" = {
-        fsType = "ext4";
-        device = "/dev/sda1";
-      };
+      fileSystems = mkMerge [
+        (remoteCfg.fileSystems or {})
+        {
+          "/" = {
+            fsType = "ext4";
+            device = "/dev/sda1";
+          };
+        }
+      ];
 
       networking.defaultGateway = "172.31.1.1";
       
@@ -93,6 +104,10 @@ in
         source = "hetznercloud/hcloud";
         version = ">= 1.44.0";
       };
+      ssh = {
+        source = "loafoe/ssh";
+        version = ">= 2.7.0";
+      };
     };
   };
 
@@ -102,6 +117,41 @@ in
     in
     {
       hcloud_server = mapAttrs (_: node: node.config.deployment.hcloud) nodes';
+      ssh_resource = mapAttrs (name: node: {
+        user = node.config.deployment.targetUser;
+        host = node.config.deployment.targetHost;
+        port = mkIf (node.config.deployment.targetPort != null) node.config.deployment.targetPort;
+        private_key = mkIf node.config.deployment.provisionSSHKey (tf.ref "tls_private_key.teraflops.private_key_openssh");
+
+        # https://github.com/elitak/nixos-infect/blob/5ef3f953d32ab92405b280615718e0b80da2ebe6/nixos-infect#L219
+        file = {
+          destination = "/tmp/teraflops.sh";
+          permissions = "0700";
+          content = ''
+            #!/usr/bin/env bash
+
+            esp=""
+            for d in /boot/EFI /boot/efi /boot; do
+              [[ ! -d "$d" ]] && continue
+              [[ "$d" == "$(df "$d" --output=target | sed 1d)" ]] \
+                && esp="$(df "$d" --output=source | sed 1d)" \
+                && break
+            done
+            [[ -z "$esp" ]] && { echo '{}'; exit 0; }
+            for uuid in /dev/disk/by-uuid/*; do
+              [[ $(readlink -f "$uuid") == "$esp" ]] && echo "{\"boot\": {\"loader\": {\"grub\": {\"efiSupport\": true, \"efiInstallAsRemovable\": true, \"device\": \"nodev\"}}}, \"fileSystems\": {\"/boot\": {\"device\": \"$uuid\", \"fsType\": \"vfat\"}}}" && exit 0
+            done
+          '';
+        };
+
+        commands = [
+          "/tmp/teraflops.sh"
+        ];
+
+        depends_on = [
+          "hcloud_server.${name}"
+        ];
+      }) nodes';
     };
 } // lib.mapAttrs (_: node: { modulesPath, ... }: {
   imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];
