@@ -41,7 +41,7 @@
             memory = "1.0 gib";
           };
 
-          system.stateVersion = "23.11";
+          system.stateVersion = "24.05";
         };
 
         machine = { pkgs, ... }: {
