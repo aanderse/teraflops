@@ -41,7 +41,7 @@
             size = "s-1vcpu-1gb";
           };
 
-          system.stateVersion = "23.11";
+          system.stateVersion = "24.05";
         };
 
         machine = { pkgs, ... }: {

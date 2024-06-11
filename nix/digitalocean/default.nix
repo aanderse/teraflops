@@ -200,7 +200,7 @@ in
 
             provisioner.remote-exec = {
               inline = [
-                "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=digitalocean NIX_CHANNEL=nixos-23.11 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
+                "curl https://raw.githubusercontent.com/elitak/nixos-infect/master/nixos-infect | PROVIDER=digitalocean NIX_CHANNEL=nixos-24.05 NO_REBOOT=true bash 2>&1 | tee /tmp/infect.log"
                 "shutdown -r +0"
               ];
             };
