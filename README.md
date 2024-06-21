@@ -135,7 +135,7 @@ _NOTE:_ Both `outputs` and `resources` will be `null` when a `teraflops` module 
 ### NixOps
 
 - `NixOps` builds a high level `nix` api on top of various cloud providers which includes full build time validation, though requires extensive `python` development for every backend desired, many of which do not yet exist
-- `teraflops` leverags `terraform` for all of this work so as long as a `terraform` backend exists it is near trivial to create a `teraflops` module for it
+- `teraflops` leverages `terraform` for all of this work so as long as a `terraform` backend exists it is near trivial to create a `teraflops` module for it
 
 - `NixOps` development is has lagged for a number of years, though apparently there are [plans](https://github.com/NixOS/nixops/issues/1574#issuecomment-1866651601) to bring it back!
 - `teraflops` is a young project and relies on established software like `colmena`, `terraform`, and `nixos-infect` to provide all major functionality making `teraflops` already quite a capable tool
