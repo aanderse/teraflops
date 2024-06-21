@@ -117,6 +117,10 @@ In addition to the regular `nix` module inputs and those defined by calls to the
 
 _NOTE:_ Both `outputs` and `resources` will be `null` when a `teraflops` module is evaluated for the purpose of generating `terraform` code in order to avoid recursion.
 
+## `opentofu` support
+
+`teraflops` provides support for `opentofu` via `nixpkgs`. See [examples/opentofu](examples/opentofu/flake.nix) for a working example.
+
 ## Comparison
 
 ### colmena
