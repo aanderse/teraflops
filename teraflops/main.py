@@ -541,7 +541,7 @@ class App:
 
     self.generate_main_tf_json(refresh=False, rewrite_args=True)
 
-    subprocess.run(['terraform', 'apply', '-target=terraform_data.teraflops-arguments', '-auto-approve'], stdout=subprocess.DEVNULL, check=True)
+    subprocess.run([self.terraform, 'apply', '-target=terraform_data.teraflops-arguments', '-auto-approve'], stdout=subprocess.DEVNULL, check=True)
 
   def show_args(self, args):
     if args.json:
