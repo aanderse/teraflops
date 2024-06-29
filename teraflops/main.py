@@ -123,7 +123,8 @@ class App:
       process = subprocess.run([self.terraform, 'show', '-json'], stdout=subprocess.PIPE, check=True)
       data = json.loads(process.stdout)
 
-      os.remove('main.tf.json')
+      with contextlib.suppress(FileNotFoundError):
+        os.remove('main.tf.json')
     else:
       with tempfile.NamedTemporaryFile(mode='w', dir=os.getcwd(), prefix='teraflops', suffix='.tf.json') as fp:
         # generate a minimal .tf.json file which can be used to run 'terraform show -json'
@@ -284,6 +285,9 @@ class App:
 
     process = subprocess.run([self.terraform, 'output', '-json', 'teraflops'], capture_output=True)
 
+    with contextlib.suppress(FileNotFoundError):
+      os.remove('main.tf.json')
+
     try:
       output = json.loads(process.stdout)
     except:
@@ -335,6 +339,9 @@ class App:
     # if nix_version.at_least(2, 10):
     #   repl_cmd.arg("--file");
     cmd += [self.generate_repl_nix()]
+
+    with contextlib.suppress(FileNotFoundError):
+      os.remove('main.tf.json')
 
     subprocess.run(cmd, check=True)
 
