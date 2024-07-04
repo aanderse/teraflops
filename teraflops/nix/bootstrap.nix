@@ -50,4 +50,10 @@ in
       }
     ] ++ (map (i: let expr = if builtins.isFunction i then i (dummyArgs i) else i; in expr.terraform or { }) imports);
   }).config;
+
+  module = (lib.evalModules {
+    modules = [
+      { _module.freeformType = jsonType; }
+    ] ++ (map (i: let expr = if builtins.isFunction i then i (dummyArgs i) else i; in expr.module or { }) imports);
+  }).config;
 }
