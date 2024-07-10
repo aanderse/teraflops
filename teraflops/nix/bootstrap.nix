@@ -24,7 +24,7 @@ let
 
   getImports = expr:
     let
-      expr' = if builtins.isPath expr then import expr else expr;
+      expr' = if builtins.isPath expr || builtins.isString expr then import expr else expr;
       imports =
         if builtins.isFunction expr' then
           (expr' (dummyArgs expr')).imports or []
