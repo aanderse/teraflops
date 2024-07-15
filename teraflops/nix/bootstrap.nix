@@ -36,7 +36,7 @@ let
 
   imports = with lib; unique (flatten (getImports flakeExpr));
 in
-{
+lib.filterAttrs (_: v: v != { }) {
   terraform = (lib.evalModules {
     modules = [
       { _module.freeformType = jsonType; }
