@@ -337,8 +337,7 @@ class App:
     if args.show_trace:
       cmd += ['--show-trace']
     # if nix_version.at_least(2, 10):
-    #   repl_cmd.arg("--file");
-    cmd += [self.generate_repl_nix()]
+    cmd += ['--file', self.generate_repl_nix()]
 
     with contextlib.suppress(FileNotFoundError):
       os.remove('main.tf.json')
