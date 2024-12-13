@@ -352,24 +352,6 @@ class App:
     cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); arguments = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f ({ inherit nodes pkgs lib; inherit (terraform) outputs resources; } // arguments)' % (os.path.join(self.tempdir, 'terraform.json'), os.path.join(self.tempdir, 'arguments.json'), args.expr)]
     subprocess.run(cmd, check=True)
 
-  def eval_jobs(self, args):
-    cmd = ['nix-eval-jobs', '--max-memory-size', '12000', '--workers', '12']
-    if args.show_trace:
-      cmd += ['--show-trace']
-    cmd += ['--expr']
-    cmd += ["""
-    let
-      colmena = builtins.getFlake "github:zhaofengli/colmena";
-      eval = colmena.outputs.lib.makeHive (import %s);
-
-      terraform = with builtins; fromJSON (readFile %s);
-      f = %s;
-    in
-      eval.introspect ({ nodes, pkgs, lib }: f { inherit nodes pkgs lib; inherit (terraform) outputs resources; })
-    """ % (self.generate_hive_nix(full_eval=True), os.path.join(self.tempdir, 'terraform.json'), args.expr)]
-
-    subprocess.run(cmd, check=True)
-
   def deploy(self, args):
     # apply
     self.generate_main_tf_json(refresh=True)
@@ -775,12 +757,6 @@ class App:
     eval_parser = subparsers.add_parser('eval', help='evaluate an expression using the complete configuration')
     eval_parser.set_defaults(func=self.eval)
     eval_parser.add_argument('expr', type=str, help='the nix expression')
-
-    # TODO: drop this
-    # subparser for the 'eval_jobs' command
-    eval_jobs_parser = subparsers.add_parser('eval-jobs')
-    eval_jobs_parser.set_defaults(func=self.eval_jobs)
-    eval_jobs_parser.add_argument('expr', type=str)
 
     # subparser for the 'deploy' command
     deploy_parser = subparsers.add_parser('deploy', parents=[confirm_parser, on_parser], help='deploy the configuration')
