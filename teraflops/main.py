@@ -345,12 +345,27 @@ class App:
     subprocess.run(cmd, check=True)
 
   def eval(self, args):
-    cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval']
-    if args.show_trace:
-      cmd += ['--show-trace']
-    # TODO: make `terraform` variable inaccessible from within expression
-    cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); arguments = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f ({ inherit nodes pkgs lib; inherit (terraform) outputs resources; } // arguments)' % (os.path.join(self.tempdir, 'terraform.json'), os.path.join(self.tempdir, 'arguments.json'), args.expr)]
-    subprocess.run(cmd, check=True)
+    hive_nix = self.generate_hive_nix(full_eval=True)
+
+    async def foo_bar(expr):
+      cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval']
+      if args.show_trace:
+        cmd += ['--show-trace']
+      # TODO: make `terraform` variable inaccessible from within expression
+      cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); arguments = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f ({ inherit nodes pkgs lib; inherit (terraform) outputs resources; } // arguments)' % (os.path.join(self.tempdir, 'terraform.json'), os.path.join(self.tempdir, 'arguments.json'), expr)]
+
+      process = await asyncio.create_subprocess_exec(*cmd) #, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+      stdout, stderr = await process.communicate()
+
+      if process.returncode != 0:
+        sys.exit(1)
+
+    async def run():
+      async with asyncio.TaskGroup() as tg:
+        for expr in args.expr:
+          tg.create_task(foo_bar(expr))
+
+    asyncio.run(run())
 
   def deploy(self, args):
     # apply
@@ -756,7 +771,7 @@ class App:
     # subparser for the 'eval' command
     eval_parser = subparsers.add_parser('eval', help='evaluate an expression using the complete configuration')
     eval_parser.set_defaults(func=self.eval)
-    eval_parser.add_argument('expr', type=str, help='the nix expression')
+    eval_parser.add_argument('expr', nargs='+', type=str, help='the nix expression(s) to evaluate')
 
     # subparser for the 'deploy' command
     deploy_parser = subparsers.add_parser('deploy', parents=[confirm_parser, on_parser], help='deploy the configuration')
