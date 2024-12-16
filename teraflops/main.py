@@ -347,23 +347,25 @@ class App:
   def eval(self, args):
     hive_nix = self.generate_hive_nix(full_eval=True)
 
-    async def foo_bar(expr):
-      cmd = ['colmena', '--config', self.generate_hive_nix(full_eval=True), 'eval']
+    async def colmena_eval(expr):
+      cmd = ['colmena', '--config', hive_nix, 'eval']
       if args.show_trace:
         cmd += ['--show-trace']
       # TODO: make `terraform` variable inaccessible from within expression
       cmd += ['-E', 'let terraform = with builtins; fromJSON (readFile %s); arguments = with builtins; fromJSON (readFile %s); f = %s; in { nodes, pkgs, lib }: f ({ inherit nodes pkgs lib; inherit (terraform) outputs resources; } // arguments)' % (os.path.join(self.tempdir, 'terraform.json'), os.path.join(self.tempdir, 'arguments.json'), expr)]
 
-      process = await asyncio.create_subprocess_exec(*cmd) #, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-      stdout, stderr = await process.communicate()
+      process = await asyncio.create_subprocess_exec(*cmd)
+      _, _ = await process.communicate()
 
       if process.returncode != 0:
-        sys.exit(1)
+        raise Exception(process.stderr)
 
     async def run():
-      async with asyncio.TaskGroup() as tg:
-        for expr in args.expr:
-          tg.create_task(foo_bar(expr))
+      try:
+        async with asyncio.TaskGroup() as tg:
+          tasks = [tg.create_task(colmena_eval(expr)) for expr in args.expr]
+      except:
+        sys.exit(1)
 
     asyncio.run(run())
 
