@@ -419,10 +419,10 @@ class App:
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming']
-    if args.eval_node_limit:
-      cmd += ['--eval-node-limit', args.eval_node_limit]
-    if args.parallel:
-      cmd += ['--parallel', args.parallel]
+    if not (args.eval_node_limit is None):
+      cmd += ['--eval-node-limit', str(args.eval_node_limit)]
+    if not (args.parallel is None):
+      cmd += ['--parallel', str(args.parallel)]
     if args.reboot:
       cmd += ['boot', '--reboot']
     else:
@@ -452,8 +452,8 @@ class App:
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming']
-    if args.eval_node_limit:
-      cmd += ['--eval-node-limit', args.eval_node_limit]
+    if not (args.eval_node_limit is None):
+      cmd += ['--eval-node-limit', str(args.eval_node_limit)]
     cmd += ['build']
     subprocess.run(cmd, check=True)
 
@@ -466,10 +466,10 @@ class App:
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming']
-    if args.eval_node_limit:
-      cmd += ['--eval-node-limit', args.eval_node_limit]
-    if args.parallel:
-      cmd += ['--parallel', args.parallel]
+    if not (args.eval_node_limit is None):
+      cmd += ['--eval-node-limit', str(args.eval_node_limit)]
+    if not (args.parallel is None):
+      cmd += ['--parallel', str(args.parallel)]
     cmd += ['push']
     subprocess.run(cmd, check=True)
 
@@ -482,10 +482,10 @@ class App:
     if args.on:
       cmd += ['--on', args.on]
     cmd += ['--evaluator', 'streaming']
-    if args.eval_node_limit:
-      cmd += ['--eval-node-limit', args.eval_node_limit]
-    if args.parallel:
-      cmd += ['--parallel', args.parallel]
+    if not (args.eval_node_limit is None):
+      cmd += ['--eval-node-limit', str(args.eval_node_limit)]
+    if not (args.parallel is None):
+      cmd += ['--parallel', str(args.parallel)]
     if args.reboot:
       cmd += ['boot', '--reboot']
     else:
