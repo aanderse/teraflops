@@ -418,7 +418,9 @@ class App:
       cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
-    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10']
+    cmd += ['--evaluator', 'streaming']
+    if args.eval_node_limit:
+      cmd += ['--eval-node-limit', args.eval_node_limit]
     if args.reboot:
       cmd += ['boot', '--reboot']
     else:
@@ -447,7 +449,10 @@ class App:
       cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
-    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'build']
+    cmd += ['--evaluator', 'streaming']
+    if args.eval_node_limit:
+      cmd += ['--eval-node-limit', args.eval_node_limit]
+    cmd += ['build']
     subprocess.run(cmd, check=True)
 
   def push(self, args):
@@ -458,7 +463,10 @@ class App:
       cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
-    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10', 'push']
+    cmd += ['--evaluator', 'streaming']
+    if args.eval_node_limit:
+      cmd += ['--eval-node-limit', args.eval_node_limit]
+    cmd += ['push']
     subprocess.run(cmd, check=True)
 
   def activate(self, args):
@@ -469,7 +477,9 @@ class App:
       cmd += ['--verbose']
     if args.on:
       cmd += ['--on', args.on]
-    cmd += ['--evaluator', 'streaming', '--eval-node-limit', '10']
+    cmd += ['--evaluator', 'streaming']
+    if args.eval_node_limit:
+      cmd += ['--eval-node-limit', args.eval_node_limit]
     if args.reboot:
       cmd += ['boot', '--reboot']
     else:
@@ -757,6 +767,9 @@ class App:
     on_parser = argparse.ArgumentParser(add_help=False)
     on_parser.add_argument('--on', metavar='<NODES>', help='select a list of nodes to deploy to')
 
+    eval_node_limit_parser = argparse.ArgumentParser(add_help=False)
+    eval_node_limit_parser.add_argument('--eval-node-limit', metavar='<LIMIT>', type=int, help='limits the maximum number of hosts to be evaluated at once')
+
     subparsers = parser.add_subparsers(title='subcommands') #, dest='subcommand')
 
     # subparser for the 'init' command
@@ -776,7 +789,7 @@ class App:
     eval_parser.add_argument('expr', nargs='+', type=str, help='the nix expression(s) to evaluate')
 
     # subparser for the 'deploy' command
-    deploy_parser = subparsers.add_parser('deploy', parents=[confirm_parser, on_parser], help='deploy the configuration')
+    deploy_parser = subparsers.add_parser('deploy', parents=[confirm_parser, on_parser, eval_node_limit_parser], help='deploy the configuration')
     deploy_parser.set_defaults(func=self.deploy)
     deploy_parser.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
 
@@ -789,15 +802,15 @@ class App:
     apply_parser.set_defaults(func=self.apply)
 
     # subparser for the 'build' command
-    build_parser = subparsers.add_parser('build', parents=[on_parser], help='build the system profiles')
+    build_parser = subparsers.add_parser('build', parents=[on_parser, eval_node_limit_parser], help='build the system profiles')
     build_parser.set_defaults(func=self.build)
 
     # subparser for the 'push' command
-    push_parser = subparsers.add_parser('push', parents=[on_parser], help='copy the closures to remote nodes')
+    push_parser = subparsers.add_parser('push', parents=[on_parser, eval_node_limit_parser], help='copy the closures to remote nodes')
     push_parser.set_defaults(func=self.push)
 
     # subparser for the 'activate' command
-    activate_parser = subparsers.add_parser('activate', parents=[on_parser], help='apply configurations on remote nodes')
+    activate_parser = subparsers.add_parser('activate', parents=[on_parser, eval_node_limit_parser], help='apply configurations on remote nodes')
     activate_parser.set_defaults(func=self.activate)
     activate_parser.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
 
