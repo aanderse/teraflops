@@ -1,7 +1,8 @@
-# this file is used by `hive.nix` and `terraform.nix` to work with a given teraflops deploy specified by `flake`
-{ flake ? builtins.getFlake (toString "%s") }:
+{ flake ? builtins.getFlake (toString ../..), terraform_json ? null }:
 let
-  lib = flake.inputs.nixpkgs.lib;
+  inherit (flake.inputs.nixpkgs) lib;
+
+  # copy/paste from nixpkgs/pkgs/pkgs-lib/formats.nix
   jsonType = with lib.types; let
     valueType = nullOr (oneOf [
       bool
@@ -16,68 +17,58 @@ let
     };
   in valueType;
 
-  # arguments that have been set with the 'set-args' command
-  arguments = with builtins; fromJSON (readFile ./arguments.json);
-
   terraform =
     let
       # `terraform.json` is a slightly processed version of `terraform show -json` produced by `teraflops` for consumption here
-      value = with builtins; lib.optionalAttrs (pathExists ./terraform.json) (fromJSON (readFile ./terraform.json));
+      value = with builtins; lib.optionalAttrs (terraform_json != null) (fromJSON (readFile terraform_json));
     in
     {
       outputs = value.outputs or null;
       resources = value.resources or null;
     };
 
-  module = { options, config, lib, ... }: with lib; {
+  module = { options, config, lib, ... }: {
     options = {
-      # pass directly to colmena
-      meta = mkOption {
-        type = with types; attrsOf unspecified;
+      meta = lib.mkOption {
+        type = with lib.types; attrsOf unspecified;
         default = { };
       };
-    } // genAttrs [ "check" "data" "locals" "module" "output" "provider" "removed" "resource" "run" "terraform" "variable" ] (value: mkOption {
-      # provide an option for every (useful?) type of top level terraform object
-      type = lib.types.deferredModuleWith {
-        staticModules = [
-          { _module.freeformType = jsonType; }
-        ];
+
+      defaults = lib.mkOption {
+        type = lib.types.deferredModule;
+        default = { };
       };
-      default = {};
+
+      # TODO: machines = lib.mkOption { type = with lib.types; attrsOf deferredModule; default = { }; };
+    } // lib.genAttrs [ "module" "terraform" ] (value: lib.mkOption {
+      type = jsonType;
+      default = { };
+    }) // lib.genAttrs [ "check" "data" "locals" "output" "provider" "removed" "resource" "run" "variable" ] (value: lib.mkOption {
+      type = lib.types.submoduleWith {
+        shorthandOnlyDefinesConfig = true;
+        modules = lib.singleton {
+          _module.freeformType = jsonType;
+        };
+        specialArgs = {
+          inherit nodes;
+        };
+      };
+      default = { };
     });
 
     config = {
-      _module.freeformType = with types; attrsOf deferredModule;
+      _module.freeformType = with lib.types; attrsOf deferredModule; # TODO: drop in favour of `machines` option
 
-      defaults = { name, lib, ... }: with lib; {
-        options.deployment.targetEnv = mkOption {
-          type = with types; nullOr str;
-          default = null;
-          description = ''
-            This option specifies the type of the environment in which the
-            machine is to be deployed by `teraflops`.
-          '';
-        };
 
-        options.deployment.provisionSSHKey = mkOption {
-          type = types.bool;
-          default = true;
-          description = ''
-            This option specifies whether to let `teraflops` provision SSH deployment keys.
 
-            `teraflops` will by default generate an SSH key, store the private key in its state file,
-            and add the public key to the remote host.
 
-            Setting this option to `false` will disable this behaviour
-            and rely on you to manage your own SSH keys by yourself and to ensure
-            that `ssh` has access to any keys it requires.
-          '';
-        };
 
-        config = {
-          networking.hostName = mkDefault name;
-        };
-      };
+
+
+
+
+
+
 
       terraform = {
         # TODO: keep this in sync with bootstrap.nix
@@ -99,11 +90,6 @@ let
               algorithm = "ED25519";
             };
           };
-
-          # store teraflops arguments (see set-args and show-args commands) in a terraform_data resource
-          terraform_data = mkIf (arguments != { }) {
-            teraflops-arguments.input = arguments;
-          };
         };
 
       # `colmena exec` is relatively slow because it needs to do a nix evaluation every time it is run
@@ -124,6 +110,50 @@ let
             };
           };
         };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      defaults = { name, lib, ... }: {
+        options.deployment.targetEnv = lib.mkOption {
+          type = with lib.types; nullOr str;
+          default = null;
+          description = ''
+            This option specifies the type of the environment in which the
+            machine is to be deployed by `teraflops`.
+          '';
+        };
+
+        options.deployment.provisionSSHKey = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            This option specifies whether to let `teraflops` provision SSH deployment keys.
+
+            `teraflops` will by default generate an SSH key, store the private key in its state file,
+            and add the public key to the remote host.
+
+            Setting this option to `false` will disable this behaviour
+            and rely on you to manage your own SSH keys by yourself and to ensure
+            that `ssh` has access to any keys it requires.
+          '';
+        };
+
+        config = {
+          networking.hostName = lib.mkDefault name;
+        };
+      };
     };
   };
 
@@ -138,13 +168,69 @@ let
         };
       }
       {
-        _file = "${flake.outPath}/flake.nix";
+        _file = flake.outPath + "/flake.nix";
         imports = [ flake.outputs.teraflops ];
       }
     ];
 
-    # provide terraform resources as specialArgs so they can be used to alter the structure of a teraflops `config`
-    specialArgs = { inherit (terraform) outputs resources; } // arguments;
+    specialArgs = { inherit (terraform) outputs resources; };
   };
+
+  ##########################
+
+  machines = builtins.removeAttrs eval.config (builtins.attrNames eval.options);
+
+  pkgs = eval.config.meta.nixpkgs;
+  evalConfig = import (pkgs.path + "/nixos/lib/eval-config.nix");
+
+  nodes = lib.mapAttrs (name: module: evalConfig {
+    modules = [
+      eval.config.defaults
+      module
+      (builtins.getFlake "github:zhaofengli/colmena").nixosModules.deploymentOptions # TODO: replace with our own
+
+      {
+        _module.args = {
+          inherit name nodes;
+        };
+
+        nixpkgs.pkgs = pkgs;
+        # nixpkgs.overlays = lib.mkBefore pkgs.overlays;
+        # nixpkgs.config = lib.mkBefore pkgs.config;
+      }
+    ];
+  }) machines;
 in
-  eval
+{
+  inherit nodes;
+
+  keys = lib.mapAttrs (_: node: node.config.deployment.keys) nodes;
+
+  terraform = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { }) {
+    inherit (eval.config)
+      check
+      data
+      locals
+      module
+      output
+      provider
+      removed
+      resource
+      run
+      terraform
+      variable
+    ;
+  });
+
+  bootstrap = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { }) {
+    inherit (eval.config)
+      module
+      # provider
+      terraform
+    ;
+  });
+
+  evalFn = fnOrExpr: if builtins.isFunction fnOrExpr then fnOrExpr { inherit (terraform) resources outputs; inherit nodes pkgs lib; } else fnOrExpr;
+
+  repl = { inherit (terraform) resources outputs; inherit nodes pkgs lib; };
+}

@@ -9,15 +9,15 @@ authors = [
   {name = "Aaron Andersen", email = "aaron@fosslib.net"}
 ]
 description = "A simple 'Hello World' application"
-version = "0.0.1"
+version = "0.1.1"
 readme = "README.md"
 license = {text = "MIT"}
 dependencies = [
-  "termcolor"
+  "rich"
 ]
 
 [project.scripts]
-teraflops = "teraflops.main:main"
+teraflops = "teraflops.main:run"
 
 [tool.setuptools.packages.find]
 include = ["teraflops"]

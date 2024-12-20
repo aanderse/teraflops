@@ -12,7 +12,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        packages.default = pkgs.python312.pkgs.callPackage ./nix/teraflops.nix {};
+        packages.default = pkgs.python313.pkgs.callPackage ./nix/teraflops.nix {};
 
         devShells.default = with pkgs;
           mkShell {
