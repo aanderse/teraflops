@@ -134,6 +134,7 @@ let
         _module.args.tf = {
           mkAlias = alias: attrs: { __aliases = { "${alias}" = attrs; }; };
           ref = ref: "\${${ref}}";
+          toSet = value: "\${toset(${lib.generators.toJSON { } value})}";
         };
       }
       {
