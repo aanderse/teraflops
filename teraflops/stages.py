@@ -55,6 +55,7 @@ async def eval(console, name, terraform_json):
 async def build(console, name, drv):
   cmd = [
     'nix-build',
+    '--no-out-link',
     drv,
   ]
 
