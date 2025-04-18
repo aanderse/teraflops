@@ -15,6 +15,9 @@ eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 @contextlib.asynccontextmanager
 async def generate_full_terraform_config():
+  tf_data_dir = os.getenv('TF_DATA_DIR', '.terraform')
+  tf_cache_file = os.path.join(tf_data_dir, 'teraflops.json')
+
   process = await asyncio.create_subprocess_exec('nix-build', '--quiet', '--no-out-link', eval_path, '-A', 'terraform', '--arg', 'flake', 'builtins.getFlake (toString ./.)', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
   stdout, stderr = await process.communicate()
 
@@ -23,6 +26,12 @@ async def generate_full_terraform_config():
 
   tf_json = stdout.strip()
 
+  # keep a cached copy of main.tf.json
+  os.makedirs(tf_data_dir, exist_ok=True)
+  shutil.copy(tf_json, tf_cache_file)
+  os.chmod(tf_cache_file, 0o664)
+
+  # make main.tf.json available to terraform
   shutil.copy(tf_json, 'main.tf.json')
   os.chmod('main.tf.json', 0o664)
 
