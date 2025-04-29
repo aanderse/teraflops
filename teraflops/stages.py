@@ -131,7 +131,7 @@ async def copy(console, name, deployment, toplevel):
     # console.info(f'{name} -> len: {len(lines)}, value: "{stderr.decode()}"')
     console.update(msg, f'push failed: {lines[-1].strip()}', status='failure')
 
-    raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
+    raise CalledProcessError(process.returncode, stderr=stderr)
 
   console.update(msg, 'pushed system closure', status='success')
 
