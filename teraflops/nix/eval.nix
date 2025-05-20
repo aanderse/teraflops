@@ -83,14 +83,14 @@ let
         let
           nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
         in
-        {
-          # inject a ssh private key terraform resource if `provisionSSHKey` is set
-          tls_private_key = mkIf (nodes' != {}) {
-            teraflops = {
-              algorithm = "ED25519";
+          mkIf (nodes' != {}) {
+            # inject a ssh private key terraform resource if `provisionSSHKey` is set
+            tls_private_key = {
+              teraflops = {
+                algorithm = "ED25519";
+              };
             };
           };
-        };
 
       # `colmena exec` is relatively slow because it needs to do a nix evaluation every time it is run
       # since `teraflops` has state this can be used to speed up the equivalent operation, `teraflops ssh-for-each`
