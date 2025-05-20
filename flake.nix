@@ -12,6 +12,8 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
+        packages.teraflops = self.packages.${system}.default;
+
         packages.default = pkgs.python313.pkgs.callPackage ./nix/teraflops.nix {};
 
         devShells.default = with pkgs;
