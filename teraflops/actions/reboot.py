@@ -8,7 +8,7 @@ from teraflops.console import Console
 
 async def run(args):
 
-  console = Console(verbose=True)
+  console = Console(args.verbose)
 
   # TODO: some sort of message, right?
   output_data = await nodes.get_teraflops_data()
