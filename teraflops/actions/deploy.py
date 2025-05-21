@@ -55,6 +55,14 @@ async def run(args):
 
       if args.reboot:
         value = await stages.reboot(console, name, deployment)
+
+        if not args.no_keys:
+          await stages.upload_keys(console, name, deployment, terraform_json)
+      else:
+        # TODO: this becomes redundant once we upload post activation keys
+        if not args.no_keys:
+          await stages.upload_keys(console, name, deployment, terraform_json)
+
     except CalledProcessError as e:
       errors[name] = e
 
