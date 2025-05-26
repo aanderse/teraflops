@@ -206,7 +206,21 @@ in
 
   keys = lib.mapAttrs (_: node: node.config.deployment.keys) nodes;
 
-  terraform = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { }) {
+  # includes hack to account for provider aliases: https://developer.hashicorp.com/terraform/language/providers/configuration#alias-multiple-provider-configurations
+  # equivalent in nix:
+  #
+  # provider = { lib, ... }: {
+  #   aws = lib.mkMerge [
+  #     {
+  #       region = "us-east-1";
+  #     }
+  #     (tf.mkAlias "aws" {
+  #       alias = "west";
+  #       region = "us-west-2";
+  #     })
+  #   ];
+  # };
+  terraform = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { }) ({
     inherit (eval.config)
       check
       data
@@ -220,7 +234,7 @@ in
       terraform
       variable
     ;
-  });
+  } // { provider = lib.flatten (lib.mapAttrsToList (name: attrs: [ { "${name}" = builtins.removeAttrs attrs ["__aliases"]; } ] ++ (lib.mapAttrsToList (k: v: { "${k}" = v; }) (attrs.__aliases or { }))) eval.config.provider); }));
 
   bootstrap = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { }) {
     inherit (eval.config)
