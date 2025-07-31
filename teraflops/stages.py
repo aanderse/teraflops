@@ -80,7 +80,7 @@ async def build(console, name, drv):
     if len(lines) > 0:
       console.update(msg, f'build failed: {lines[-1].strip()}', status='failure')
     else:
-      console.update(msg, f'build failed: an expected failure occurred', status='failure')
+      console.update(msg, f'build failed: an unexpected failure occurred', status='failure')
 
     raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
