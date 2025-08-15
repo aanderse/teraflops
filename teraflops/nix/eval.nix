@@ -43,7 +43,7 @@ let
     } // lib.genAttrs [ "module" "terraform" ] (value: lib.mkOption {
       type = jsonType;
       default = { };
-    }) // lib.genAttrs [ "check" "data" "locals" "output" "provider" "removed" "resource" "run" "variable" ] (value: lib.mkOption {
+    }) // lib.genAttrs [ "check" "data" "ephemeral" "locals" "output" "provider" "removed" "resource" "run" "variable" ] (value: lib.mkOption {
       type = lib.types.submoduleWith {
         shorthandOnlyDefinesConfig = true;
         modules = lib.singleton {
@@ -224,6 +224,7 @@ in
     inherit (eval.config)
       check
       data
+      ephemeral
       locals
       module
       output
