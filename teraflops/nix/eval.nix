@@ -164,6 +164,7 @@ let
         _module.args.tf = {
           mkAlias = alias: attrs: { __aliases = { "${alias}" = attrs; }; };
           ref = ref: "\${${ref}}";
+          toMap = value: "\${tomap(${lib.generators.toJSON { } value})}";
           toSet = value: "\${toset(${lib.generators.toJSON { } value})}";
         };
       }
