@@ -5,6 +5,7 @@ import sys
 
 from teraflops import nodes
 from teraflops import parsers
+from teraflops import ssh
 from teraflops import stages
 from teraflops.console import Console
 from teraflops.error import CalledProcessError
@@ -14,9 +15,9 @@ async def run(args):
   errors = {}
   console = Console(args.verbose)
 
-  async def pipeline(console, name, node, terraform_json):
+  async def pipeline(console, name, node, terraform_json, private_key):
     try:
-      await stages.upload_keys(console, name, node, terraform_json)
+      await stages.upload_keys(console, name, node, terraform_json, private_key)
     except CalledProcessError as e:
       errors[name] = e
 
@@ -27,15 +28,16 @@ async def run(args):
   else:
     console.info(f'selected {len(selected)} out of {len(all)} hosts')
 
-  with console.refresh():
-    output_data = await nodes.get_teraflops_data()
-    console.info('teraflops data gathered')
+  output_data = await nodes.get_teraflops_data()
+  console.info('teraflops data gathered')
+
+  with console.refresh(), ssh.get_private_key(output_data) as private_key:
 
     async with generate_terraform_data_for_nix() as terraform_json:
       console.info('terraform data gathered, ready to do work')
       async with asyncio.TaskGroup() as tg:
         for name in selected:
-          tg.create_task(pipeline(console, name, output_data['nodes'][name], terraform_json))
+          tg.create_task(pipeline(console, name, output_data['nodes'][name], terraform_json, private_key))
 
   for name, e in errors.items():
     console.error(f'failed to upload keys to {name} - logs:')

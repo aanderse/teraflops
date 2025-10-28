@@ -7,6 +7,7 @@ import sys
 
 from teraflops import nodes
 from teraflops import parsers
+from teraflops import ssh
 from teraflops import stages
 from teraflops.console import Console
 from teraflops.utils import generate_terraform_data_for_nix
@@ -15,12 +16,12 @@ async def run(args):
   errors = {}
   console = Console(args.verbose)
 
-  async def pipeline(console, name, deployment, terraform_json, drv):
+  async def pipeline(console, name, deployment, terraform_json, drv, private_key):
     try:
       if drv is None:
         drv = await stages.eval(console, name, terraform_json)
       toplevel = await stages.build(console, name, drv)
-      await stages.copy(console, name, deployment, toplevel)
+      await stages.copy(console, name, deployment, toplevel, private_key)
     except Exception as e:
       errors[name] = e
 
@@ -32,10 +33,9 @@ async def run(args):
     console.info(f'selected {len(selected)} out of {len(all)} hosts')
 
   output_data = await nodes.get_teraflops_data()
-
   console.info('teraflops data gathered')
 
-  with console.refresh():
+  with console.refresh(), ssh.get_private_key(output_data) as private_key:
 
     context = contextlib.nullcontext() if args.with_drvs else generate_terraform_data_for_nix()
     async with context as terraform_json:
@@ -49,7 +49,7 @@ async def run(args):
       async with asyncio.TaskGroup() as tg:
         for name, deployment in output_data['nodes'].items():
           if name in selected:
-            tg.create_task(pipeline(console, name, deployment, terraform_json, drvs[name] if args.with_drvs else None))
+            tg.create_task(pipeline(console, name, deployment, terraform_json, drvs[name] if args.with_drvs else None, private_key))
 
   for name, e in errors.items():
     if not hasattr(e, 'stderr'):

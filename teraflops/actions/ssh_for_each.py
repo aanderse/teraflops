@@ -10,13 +10,13 @@ from teraflops.console import Console
 async def run(args):
   console = Console(args.verbose)
 
-  async def doit(console, name, node, command):
+  async def doit(console, name, node, command, private_key):
     msg = console.message(name)
 
     if args.verbose:
       console.update(msg, 'executing remote command')
 
-    process = await asyncio.create_subprocess_exec(*ssh.cmd(node, command), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(*ssh.cmd(node, command, private_key=private_key), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
@@ -33,11 +33,10 @@ async def run(args):
   else:
     console.info(f'selected {len(selected)} out of {len(all)} hosts')
 
-  with console.refresh():
-
+  with console.refresh(), ssh.get_private_key(output_data) as private_key:
     async with asyncio.TaskGroup() as tg:
       for name in selected:
-        tg.create_task(doit(console, name, output_data['nodes'][name], args.command))
+        tg.create_task(doit(console, name, output_data['nodes'][name], args.command, private_key))
 
 def register_action(subparsers):
   parser = subparsers.add_parser('ssh-for-each', parents=[parsers.on()], help='execute a command on each machine via SSH')

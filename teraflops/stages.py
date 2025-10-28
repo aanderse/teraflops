@@ -89,7 +89,7 @@ async def build(console, name, drv):
 
   return toplevel
 
-async def copy(console, name, deployment, toplevel):
+async def copy(console, name, deployment, toplevel, private_key=None):
   cmd = [
     'nix',
     '--extra-experimental-features', 'flakes nix-command',
@@ -103,8 +103,7 @@ async def copy(console, name, deployment, toplevel):
 
   msg = console.message(name, 'pushing system closure')
 
-  env={'NIX_SSHOPTS': ' '.join(ssh.opts(deployment))}
-  #env={}
+  env={'NIX_SSHOPTS': ' '.join(ssh.opts(deployment, private_key=private_key))}
 
   process = await asyncio.create_subprocess_exec(*cmd, env={**os.environ, **env}, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
 
@@ -135,10 +134,10 @@ async def copy(console, name, deployment, toplevel):
 
   console.update(msg, 'pushed system closure', status='success')
 
-async def switch_to_configuration(console, name, node, toplevel, target):
+async def switch_to_configuration(console, name, node, toplevel, target, private_key=None):
   msg = console.message(name, 'activating system profile')
 
-  cmd = ssh.cmd(node, [f'{toplevel}/bin/switch-to-configuration', target])
+  cmd = ssh.cmd(node, [f'{toplevel}/bin/switch-to-configuration', target], private_key=private_key)
 
   process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
 
@@ -159,7 +158,7 @@ async def switch_to_configuration(console, name, node, toplevel, target):
 
   console.update(msg, 'activation successful', status='success')
 
-async def upload_keys(console, name, deployment, terraform_json):
+async def upload_keys(console, name, deployment, terraform_json, private_key=None):
   cmd = [
     'nix',
     '--extra-experimental-features', 'flakes nix-command',
@@ -185,7 +184,7 @@ async def upload_keys(console, name, deployment, terraform_json):
     console.update(msg, f'uploading {key["name"]}')
     value = Template(files('teraflops').joinpath('key_uploader.template.sh').read_text()).safe_substitute(DESTINATION=key['path'], USER=key['user'], GROUP=key['group'], PERMISSIONS=key['permissions'], REQUIRE_OWNERSHIP='1')
 
-    process = await asyncio.create_subprocess_exec(*ssh.cmd(deployment, ['sh', '-c', value]), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(*ssh.cmd(deployment, ['sh', '-c', value], private_key=private_key), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate(key['text'].encode())
 
     if process.returncode != 0:
@@ -194,16 +193,16 @@ async def upload_keys(console, name, deployment, terraform_json):
 
   console.update(msg, 'uploaded keys', status='success')
 
-async def reboot(console, name, node, no_wait=False):
+async def reboot(console, name, node, no_wait=False, private_key=None):
   async def get_boot_id(node):
-    ssh_args = ['-o', 'ConnectTimeout=10'] # see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
-    proc = await asyncio.create_subprocess_exec(*ssh.cmd(node, ['cat', '/proc/sys/kernel/random/boot_id'], ssh_args), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    extra_args = ['-o', 'ConnectTimeout=10'] # see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
+    proc = await asyncio.create_subprocess_exec(*ssh.cmd(node, ['cat', '/proc/sys/kernel/random/boot_id'], private_key, extra_args), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
     stdout, _ = await proc.communicate()
 
     return None if proc.returncode != 0 else stdout.decode()
 
   async def initiate_reboot(node):
-    proc = await asyncio.create_subprocess_exec(*ssh.cmd(node, ['reboot']), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    proc = await asyncio.create_subprocess_exec(*ssh.cmd(node, ['reboot'], private_key=private_key), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
     stdout, _ = await proc.communicate()
 
     if proc.returncode == 0 or proc.returncode == 255:

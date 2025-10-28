@@ -16,12 +16,12 @@ from teraflops.utils import generate_full_terraform_config, generate_terraform_d
 TERRAFORM_EXE = 'terraform'
 
 
-async def wait_for_node(console, name, node):
+async def wait_for_node(console, name, node, private_key):
   msg = None
 
   while True:
     # see https://github.com/zhaofengli/colmena/issues/166#issuecomment-1892325999
-    proc = await asyncio.create_subprocess_exec(*ssh.cmd(node, ['cat', '/proc/sys/kernel/random/boot_id'], ['-o', 'ConnectTimeout=10']), stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+    proc = await asyncio.create_subprocess_exec(*ssh.cmd(node, ['cat', '/proc/sys/kernel/random/boot_id'], private_key, ['-o', 'ConnectTimeout=10']), stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
 
     if await proc.wait() == 0:
       break
@@ -38,30 +38,30 @@ async def run(args):
   errors = {}
   console = Console(args.verbose)
 
-  async def pipeline(console, name, deployment, terraform_json):
+  async def pipeline(console, name, deployment, terraform_json, private_key):
     try:
-      await wait_for_node(console, name, node)
+      await wait_for_node(console, name, node, private_key)
 
       drv = await stages.eval(console, name, terraform_json)
       toplevel = await stages.build(console, name, drv)
-      await stages.copy(console, name, deployment, toplevel)
+      await stages.copy(console, name, deployment, toplevel, private_key)
 
       if not args.no_keys:
-        await stages.upload_keys(console, name, deployment, terraform_json)
+        await stages.upload_keys(console, name, deployment, terraform_json, private_key)
 
-      await stages.switch_to_configuration(console, name, deployment, toplevel, 'boot' if args.reboot else 'switch')
+      await stages.switch_to_configuration(console, name, deployment, toplevel, 'boot' if args.reboot else 'switch', private_key)
 
       # TODO: upload post activation keys
 
       if args.reboot:
-        value = await stages.reboot(console, name, deployment)
+        value = await stages.reboot(console, name, deployment, private_key)
 
         if not args.no_keys:
-          await stages.upload_keys(console, name, deployment, terraform_json)
+          await stages.upload_keys(console, name, deployment, terraform_json, private_key)
       else:
         # TODO: this becomes redundant once we upload post activation keys
         if not args.no_keys:
-          await stages.upload_keys(console, name, deployment, terraform_json)
+          await stages.upload_keys(console, name, deployment, terraform_json, private_key)
 
     except CalledProcessError as e:
       errors[name] = e
@@ -82,17 +82,16 @@ async def run(args):
   else:
     console.info(f'selected {len(selected)} out of {len(all)} hosts')
 
-  with console.refresh():
-    output_data = await nodes.get_teraflops_data()
+  output_data = await nodes.get_teraflops_data()
+  console.info('teraflops data gathered')
 
-    console.info('teraflops data gathered')
-
+  with console.refresh(), ssh.get_private_key(output_data) as private_key:
     async with generate_terraform_data_for_nix() as terraform_json:
       console.info('terraform data gathered, ready to do work')
       async with asyncio.TaskGroup() as tg:
         for name, node in output_data['nodes'].items():
           if name in selected:
-            tg.create_task(pipeline(console, name, node, terraform_json))
+            tg.create_task(pipeline(console, name, node, terraform_json, private_key))
 
   for name, e in errors.items():
     console.error(f'failed to deploy {name} - logs:')

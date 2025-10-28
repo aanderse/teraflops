@@ -3,6 +3,7 @@ import subprocess
 import os
 
 from teraflops import nodes
+from teraflops import ssh
 
 async def run(args):
   output_data = await nodes.get_teraflops_data()
@@ -17,6 +18,8 @@ async def run(args):
 
   source = args.source
   target = args.target
+
+  each_node = []
 
   if ':' in args.source:
     source_machine, _, source_path = args.source.partition(':')
@@ -39,6 +42,8 @@ async def run(args):
     source += ':'
     source += source_path
 
+    each_node.append(node)
+
   if ':' in args.target:
     target_machine, _, target_path = args.target.partition(':')
 
@@ -60,9 +65,15 @@ async def run(args):
     target += ':'
     target += target_path
 
-  cmd += [source, target]
+    each_node.append(node)
 
-  subprocess.run(cmd)
+  with ssh.get_private_key(output_data, *each_node) as private_key:
+    if private_key:
+      cmd += ['-i', private_key]
+
+    cmd += [source, target]
+
+    subprocess.run(cmd)
 
 def register_action(subparsers):
   parser = subparsers.add_parser('scp', help='copy files to or from the specified machine via scp')
