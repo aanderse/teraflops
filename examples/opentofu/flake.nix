@@ -27,8 +27,6 @@
           pname = "teraflops-digitalocean";
 
           packages = [
-            colmena
-            jq
             (opentofu.withPlugins (p: map tofuProvider [ p.digitalocean p.ssh p.tls ]))
             teraflops.packages.${system}.default
           ];

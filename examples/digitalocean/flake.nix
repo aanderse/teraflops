@@ -20,8 +20,6 @@
           pname = "teraflops-digitalocean";
 
           packages = [
-            colmena
-            jq
             (terraform.withPlugins (p: [ p.digitalocean p.ssh p.tls ]))
             teraflops.packages.${system}.default
           ];

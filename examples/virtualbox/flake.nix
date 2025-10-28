@@ -20,8 +20,6 @@
           pname = "teraflops-virtualbox";
 
           packages = [
-            colmena
-            jq
             (terraform.withPlugins (p: [ p.tls p.virtualbox ]))
             teraflops.packages.${system}.default
           ];
