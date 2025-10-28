@@ -34,14 +34,14 @@
           nixpkgs = nixpkgs.legacyPackages.${system};
         };
 
-        defaults = { config, ... }: {
+        defaults = { ... }: {
           deployment.targetEnv = "virtualbox";
           deployment.virtualbox = {
             cpus = 2;
             memory = "1.0 gib";
           };
 
-          system.stateVersion = "24.05";
+          system.stateVersion = "25.05";
         };
 
         machine = { pkgs, ... }: {
