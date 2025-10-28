@@ -43,6 +43,23 @@
         };
 
         machine = { pkgs, ... }: {
+          # provision a hetzner volume called "storage" and attach to this node
+          fileSystems."/storage" = {
+            fsType = "ext4";
+
+            hcloud = {
+              name = "storage";
+              size = 10;
+            };
+          };
+
+          # provision a hetzner floating ip called "floating-ip" and attach to this node
+          networking.interfaces.eth0 = {
+            ipv4.addresses = [
+              { hcloud.name = "floating-ip"; }
+            ];
+          };
+
           environment.systemPackages = [ pkgs.hello ];
         };
       };
