@@ -27,7 +27,7 @@ let
       resources = value.resources or null;
     };
 
-  module = { options, config, lib, ... }: {
+  module = { lib, ... }: {
     options = {
       meta = lib.mkOption {
         type = with lib.types; attrsOf unspecified;
@@ -79,11 +79,11 @@ let
         };
       };
 
-      resource = { nodes, lib, ... }: with lib;
+      resource = { nodes, lib, ... }:
         let
-          nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
+          nodes' = lib.filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
         in
-          mkIf (nodes' != {}) {
+          lib.mkIf (nodes' != {}) {
             # inject a ssh private key terraform resource if `provisionSSHKey` is set
             tls_private_key = {
               teraflops = {
@@ -96,16 +96,16 @@ let
       # since `teraflops` has state this can be used to speed up the equivalent operation, `teraflops ssh-for-each`
       #
       # inject a terraform output which can be used by the `teraflops` tool for quick access to important data
-      output = { nodes, lib, ... }: with lib;
+      output = { nodes, lib, ... }:
         let
-          nodes' = filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
+          nodes' = lib.filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
         in
         {
           teraflops = {
             sensitive = true;
             value = {
               version = 1;
-              nodes = mapAttrs (_: node: { inherit (node.config.deployment) provisionSSHKey tags targetEnv targetHost targetPort targetUser; }) nodes;
+              nodes = lib.mapAttrs (_: node: { inherit (node.config.deployment) provisionSSHKey tags targetEnv targetHost targetPort targetUser; }) nodes;
               privateKey = if nodes' != {} then "\${tls_private_key.teraflops.private_key_openssh}" else null;
             };
           };
