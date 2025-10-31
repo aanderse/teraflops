@@ -48,8 +48,8 @@ async def main():
     # if no subcommand is provided, print help
     parser.print_help()
 
-if __name__ == '__main__':
-  run()
-
 def run():
   asyncio.run(main())
+
+if __name__ == '__main__':
+  run()
