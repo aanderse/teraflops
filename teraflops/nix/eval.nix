@@ -188,7 +188,9 @@ let
     modules = [
       eval.config.defaults
       module
-      (builtins.getFlake "github:zhaofengli/colmena").nixosModules.deploymentOptions # TODO: replace with our own
+
+      # slimmed down option set from colmena... thanks zhaofeng!
+      ./deployment.nix
 
       {
         _module.args = {
