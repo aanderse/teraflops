@@ -174,10 +174,6 @@ in
           services.do-agent.enable = mkDefault true;
           services.openssh.enable = true;
 
-          users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
-            resources.tls_private_key.teraflops.public_key_openssh
-          ];
-
           # terraform: resource.digitalocean_droplet
           deployment.digitalocean = {
             # NOTE: droplets seem to insist on forcing password changes

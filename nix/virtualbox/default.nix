@@ -32,10 +32,6 @@ in
       services.openssh.enable = true;
       services.openssh.authorizedKeysFiles = [ ".vbox-nixops-client-key" ];
 
-      users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
-        resources.tls_private_key.teraflops.public_key_openssh
-      ];
-
       # VirtualBox doesn't seem to lease IP addresses persistently, so we
       # may get a different IP address if dhcpcd is restarted.  So don't
       # restart dhcpcd.

@@ -111,10 +111,6 @@ in
         { label = "linode-swap"; }
       ];
 
-      users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = optionals config.deployment.provisionSSHKey [
-        resources.tls_private_key.teraflops.public_key_openssh
-      ];
-
       # terraform: resource.linode_instance
       deployment.linode = {
         image = "linode/ubuntu22.04";
