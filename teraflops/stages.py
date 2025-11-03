@@ -134,6 +134,30 @@ async def copy(console, name, deployment, toplevel, private_key=None):
 
   console.update(msg, 'pushed system closure', status='success')
 
+async def switch_profile(console, name, node, toplevel, private_key=None):
+  msg = console.message(name, 'switching system profile')
+
+  cmd = ssh.cmd(node, [f'nix-env', '-p', '/nix/var/nix/profiles/system', '--set', toplevel], private_key=private_key)
+
+  process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+
+  stdout = b''
+
+  while not process.stdout.at_eof():
+    data = await process.stdout.readline()
+    stdout += data
+    line = data.decode('utf-8').rstrip()
+
+    console.update(msg, line)
+
+  _, stderr = await process.communicate()
+
+  if process.returncode != 0: # done, error
+    console.update(msg, f'switching profile failed: {stderr.decode().strip()}', status='failure')
+    raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
+
+  console.update(msg, 'switching profile successful', status='success')
+
 async def switch_to_configuration(console, name, node, toplevel, target, private_key=None):
   msg = console.message(name, 'activating system profile')
 

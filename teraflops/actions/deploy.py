@@ -49,6 +49,7 @@ async def run(args):
       if not args.no_keys:
         await stages.upload_keys(console, name, deployment, terraform_json, private_key)
 
+      await stages.switch_profile(console, name, deployment, toplevel, private_key)
       await stages.switch_to_configuration(console, name, deployment, toplevel, 'boot' if args.reboot else 'switch', private_key)
 
       # TODO: upload post activation keys

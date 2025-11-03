@@ -33,6 +33,9 @@ async def run(args):
       else:
         target = 'switch'
 
+      if target == 'boot' or target == 'switch':
+        await stages.switch_profile(console, name, deployment, toplevel, private_key)
+
       await stages.switch_to_configuration(console, name, deployment, toplevel, target, private_key)
 
       # TODO: upload post activation keys
