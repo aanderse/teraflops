@@ -7,10 +7,11 @@ import shutil
 import tempfile
 
 from teraflops.error import CalledProcessError
+from teraflops.paths import terraform
 
 # TODO: move me
 from importlib.resources import files
-TERRAFORM_EXE = 'terraform'
+
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 @contextlib.asynccontextmanager
@@ -73,7 +74,7 @@ async def generate_minimal_terraform_config(use_cache_if_available = True):
 async def generate_terraform_data_for_nix():
 
   async with generate_minimal_terraform_config():
-    process = await asyncio.create_subprocess_exec(TERRAFORM_EXE, 'show', '-json', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(terraform(), 'show', '-json', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:

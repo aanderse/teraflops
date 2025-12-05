@@ -10,11 +10,8 @@ from teraflops import ssh
 from teraflops import stages
 from teraflops.console import Console
 from teraflops.error import CalledProcessError
+from teraflops.paths import terraform
 from teraflops.utils import generate_full_terraform_config, generate_terraform_data_for_nix
-
-
-TERRAFORM_EXE = 'terraform'
-
 
 async def wait_for_node(console, name, node, private_key):
   msg = None
@@ -68,7 +65,7 @@ async def run(args):
       errors[name] = e
 
   # apply terraform configuration
-  cmd = [TERRAFORM_EXE, 'apply']
+  cmd = [terraform(), 'apply']
   if args.confirm:
     cmd += ['-auto-approve']
 

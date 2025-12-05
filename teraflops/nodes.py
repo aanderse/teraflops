@@ -3,6 +3,7 @@ import asyncio
 import json
 
 from teraflops import utils
+from teraflops.paths import terraform
 from teraflops.error import CalledProcessError
 
 
@@ -10,13 +11,12 @@ from teraflops.error import CalledProcessError
 
 from importlib.resources import files
 
-TERRAFORM_EXE = 'terraform'
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 # the only thing this is (currently?) used for is get_teraflops_data()['nodes']
 async def get_teraflops_data():
   async with utils.generate_minimal_terraform_config():
-    process = await asyncio.create_subprocess_exec(TERRAFORM_EXE, 'output', '-json', 'teraflops', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(terraform(), 'output', '-json', 'teraflops', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
@@ -29,7 +29,7 @@ async def get_teraflops_data():
 # this information provides an extremely quick lookup which entirely bypasses nix evaluation
 async def query_cache(name):
   async with utils.generate_minimal_terraform_config():
-    process = await asyncio.create_subprocess_exec(TERRAFORM_EXE, 'output', '-json', 'teraflops', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(terraform(), 'output', '-json', 'teraflops', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:

@@ -10,6 +10,7 @@ import sys
 
 from teraflops.console import Console
 from teraflops.error import CalledProcessError
+from teraflops.paths import BinaryNotFoundError
 
 async def main():
 
@@ -35,6 +36,9 @@ async def main():
   if hasattr(args, 'func'):
     try:
       await args.func(args)
+    except BinaryNotFoundError as e:
+      print(f'{parser.prog}: error: {e}')
+      sys.exit(1)
     except subprocess.CalledProcessError as e:
       sys.exit(e.returncode)
     except CalledProcessError as e:

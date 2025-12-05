@@ -1,12 +1,11 @@
 
 import subprocess
 
+from teraflops.paths import terraform
 from teraflops.utils import generate_minimal_terraform_config
 
-TERRAFORM_EXE = 'terraform'
-
 async def run(args):
-  cmd = [TERRAFORM_EXE, 'init']
+  cmd = [terraform(), 'init']
   if args.migrate_state:
     cmd += ['-migrate-state']
   if args.reconfigure:

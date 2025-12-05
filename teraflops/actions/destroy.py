@@ -2,12 +2,11 @@
 import subprocess
 
 from teraflops import parsers
+from teraflops.paths import terraform
 from teraflops.utils import generate_full_terraform_config
 
-TERRAFORM_EXE = 'terraform'
-
 async def run(args):
-  cmd = [TERRAFORM_EXE, 'apply', '-destroy']
+  cmd = [terraform(), 'apply', '-destroy']
   if args.confirm:
     cmd += ['-auto-approve']
 
