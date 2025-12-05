@@ -16,7 +16,7 @@ async def run(args):
 
   async def pipeline(console, name, deployment, terraform_json, private_key):
     try:
-      value = await stages.reboot(console, name, deployment, args.no_wait, private_key)
+      value = await stages.reboot(console, name, deployment, no_wait=args.no_wait, private_key=private_key)
 
       if not args.no_keys and not args.no_wait:
         await stages.upload_keys(console, name, deployment, terraform_json, private_key)

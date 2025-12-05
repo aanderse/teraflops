@@ -52,7 +52,7 @@ async def run(args):
       # TODO: upload post activation keys
 
       if args.reboot:
-        value = await stages.reboot(console, name, deployment, private_key)
+        value = await stages.reboot(console, name, deployment, private_key=private_key)
 
         if not args.no_keys:
           await stages.upload_keys(console, name, deployment, terraform_json, private_key)
