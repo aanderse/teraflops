@@ -227,7 +227,7 @@ in
   #     })
   #   ];
   # };
-  terraform = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { }) ({
+  terraform = (pkgs.formats.json {}).generate "main.tf.json" (lib.filterAttrs (_: v: v != { } && v != [ ]) ({
     inherit (eval.config)
       check
       data
