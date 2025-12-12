@@ -8,7 +8,7 @@ name = "teraflops"
 authors = [
   {name = "Aaron Andersen", email = "aaron@fosslib.net"}
 ]
-description = "A simple 'Hello World' application"
+description = "teraflops - a terraform ops tool which is sure to be a flop"
 version = "0.1.1"
 readme = "README.md"
 license = {text = "MIT"}
