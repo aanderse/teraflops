@@ -53,7 +53,10 @@ async def main():
     parser.print_help()
 
 def run():
-  asyncio.run(main())
+  try:
+    asyncio.run(main())
+  except KeyboardInterrupt:
+    sys.exit(130)
 
 if __name__ == '__main__':
   run()
