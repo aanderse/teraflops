@@ -29,7 +29,7 @@ async def wait_for_node(console, name, node, private_key):
     await asyncio.sleep(2)
 
   if msg:
-    console.update(msg, description='node is now available', status='success')
+    console.update(msg, 'node is now available', status='success')
 
 async def run(args):
   errors = {}
