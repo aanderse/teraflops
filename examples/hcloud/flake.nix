@@ -5,7 +5,8 @@
     teraflops.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { nixpkgs, teraflops, ... }:
+  outputs =
+    { nixpkgs, teraflops, ... }:
     let
       system = "x86_64-linux";
 
@@ -15,16 +16,22 @@
       };
     in
     {
-      devShells.${system}.default = with pkgs;
+      devShells.${system}.default =
+        with pkgs;
         mkShell {
           pname = "teraflops-hcloud";
 
           packages = [
-            (terraform.withPlugins (p: [ p.hcloud p.ssh p.tls ]))
+            (terraform.withPlugins (p: [
+              p.hcloud
+              p.ssh
+              p.tls
+            ]))
             teraflops.packages.${system}.default
           ];
         };
-    } // {
+    }
+    // {
       teraflops = {
         imports = [ teraflops.modules.hcloud ];
 
@@ -32,7 +39,7 @@
           nixpkgs = nixpkgs.legacyPackages.${system};
         };
 
-        defaults = { ... }: {
+        defaults = {
           deployment.targetEnv = "hcloud";
           deployment.hcloud = {
             server_type = "cx11";
@@ -42,26 +49,28 @@
           system.stateVersion = "25.05";
         };
 
-        machine = { pkgs, ... }: {
-          # provision a hetzner volume called "storage" and attach to this node
-          fileSystems."/storage" = {
-            fsType = "ext4";
+        machine =
+          { pkgs, ... }:
+          {
+            # provision a hetzner volume called "storage" and attach to this node
+            fileSystems."/storage" = {
+              fsType = "ext4";
 
-            hcloud = {
-              name = "storage";
-              size = 10;
+              hcloud = {
+                name = "storage";
+                size = 10;
+              };
             };
-          };
 
-          # provision a hetzner floating ip called "floating-ip" and attach to this node
-          networking.interfaces.eth0 = {
-            ipv4.addresses = [
-              { hcloud.name = "floating-ip"; }
-            ];
-          };
+            # provision a hetzner floating ip called "floating-ip" and attach to this node
+            networking.interfaces.eth0 = {
+              ipv4.addresses = [
+                { hcloud.name = "floating-ip"; }
+              ];
+            };
 
-          environment.systemPackages = [ pkgs.hello ];
-        };
+            environment.systemPackages = [ pkgs.hello ];
+          };
       };
     };
 }

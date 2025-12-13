@@ -1,4 +1,9 @@
-{ buildPythonApplication, setuptools, setuptools-scm, rich }:
+{
+  buildPythonApplication,
+  setuptools,
+  setuptools-scm,
+  rich,
+}:
 
 buildPythonApplication {
   pname = "teraflops";
@@ -7,6 +12,9 @@ buildPythonApplication {
 
   src = ./..;
 
-  nativeBuildInputs = [ setuptools setuptools-scm ];
+  nativeBuildInputs = [
+    setuptools
+    setuptools-scm
+  ];
   propagatedBuildInputs = [ rich ];
 }

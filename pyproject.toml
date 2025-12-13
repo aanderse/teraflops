@@ -23,3 +23,20 @@ teraflops = "teraflops.main:run"
 include = ["teraflops", "teraflops.*"]
 
 [tool.setuptools_scm]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = [
+  "E",      # pycodestyle errors
+  "W",      # pycodestyle warnings
+  "F",      # pyflakes
+  "I",      # isort
+  "B",      # flake8-bugbear
+  "C4",     # flake8-comprehensions
+  "UP",     # pyupgrade
+]

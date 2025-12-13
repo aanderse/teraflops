@@ -1,65 +1,72 @@
 { name, lib, ... }:
 let
-  keyType = { lib, name, config, ... }: {
-    options = {
-      name = lib.mkOption {
-        type = lib.types.str;
-        default = name;
-        description = ''
-          File name of the key.
-        '';
-      };
+  keyType =
+    {
+      lib,
+      name,
+      config,
+      ...
+    }:
+    {
+      options = {
+        name = lib.mkOption {
+          type = lib.types.str;
+          default = name;
+          description = ''
+            File name of the key.
+          '';
+        };
 
-      text = lib.mkOption {
-        type = with lib.types; nullOr str;
-        default = null;
-        description = ''
-          Content of the key.
-        '';
-      };
+        text = lib.mkOption {
+          type = with lib.types; nullOr str;
+          default = null;
+          description = ''
+            Content of the key.
+          '';
+        };
 
-      destDir = lib.mkOption {
-        type = lib.types.path;
-        default = "/run/keys";
-        description = ''
-          Destination directory on the host.
-        '';
-      };
+        destDir = lib.mkOption {
+          type = lib.types.path;
+          default = "/run/keys";
+          description = ''
+            Destination directory on the host.
+          '';
+        };
 
-      path = lib.mkOption {
-        type = lib.types.path;
-        default = "${config.destDir}/${config.name}";
-        internal = true;
-        description = ''
-          Full path to the destination.
-        '';
-      };
+        path = lib.mkOption {
+          type = lib.types.path;
+          default = "${config.destDir}/${config.name}";
+          internal = true;
+          description = ''
+            Full path to the destination.
+          '';
+        };
 
-      user = lib.mkOption {
-        type = lib.types.str;
-        default = "root";
-        description = ''
-          The group that will own the file.
-        '';
-      };
+        user = lib.mkOption {
+          type = lib.types.str;
+          default = "root";
+          description = ''
+            The group that will own the file.
+          '';
+        };
 
-      group = lib.mkOption {
-        type = lib.types.str;
-        default = "root";
-        description = ''
-          The group that will own the file.
-        '';
-      };
+        group = lib.mkOption {
+          type = lib.types.str;
+          default = "root";
+          description = ''
+            The group that will own the file.
+          '';
+        };
 
-      permissions = lib.mkOption {
-        type = lib.types.str;
-        default = "0600";
-        description = ''
-          Permissions to set for the file.
-        '';
+        permissions = lib.mkOption {
+          type = lib.types.str;
+          default = "0600";
+          description = ''
+            Permissions to set for the file.
+          '';
+        };
       };
     };
-  };
 in
 {
   options = {
@@ -86,18 +93,18 @@ in
         '';
       };
 
-        targetUser = lib.mkOption {
-          default = "root";
-          type = with lib.types; nullOr str;
-          description = ''
-            The user to use to log into the remote node. If set to null, the
-            target user will not be specified in SSH invocations.
-          '';
-        };
+      targetUser = lib.mkOption {
+        default = "root";
+        type = with lib.types; nullOr str;
+        description = ''
+          The user to use to log into the remote node. If set to null, the
+          target user will not be specified in SSH invocations.
+        '';
+      };
 
       tags = lib.mkOption {
         type = with lib.types; listOf str;
-        default = [];
+        default = [ ];
         description = ''
           A list of tags for the node.
 
@@ -107,7 +114,7 @@ in
 
       keys = lib.mkOption {
         type = lib.types.attrsOf (lib.types.submodule keyType);
-        default = {};
+        default = { };
         description = ''
           A set of secrets to be deployed to the node.
 

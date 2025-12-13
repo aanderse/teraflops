@@ -5,27 +5,35 @@
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
-      systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-darwin" "x86_64-linux" ];
+      systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "x86_64-linux"
+      ];
     in
     {
-      devShells = nixpkgs.lib.genAttrs systems (system:
-        let
-          package = nixpkgs.legacyPackages.${system}.python313.pkgs.callPackage ./nix/teraflops.nix {};
-        in
-        {
-          default = nixpkgs.legacyPackages.${system}.mkShell {
-            pname = "teraflops";
+      devShells = nixpkgs.lib.genAttrs systems (system: {
+        default = nixpkgs.legacyPackages.${system}.mkShell {
+          pname = "teraflops";
 
-            inputsFrom = [ self.packages.${system}.default ];
-          };
-        }
-      );
+          inputsFrom = [ self.packages.${system}.default ];
 
-      packages = nixpkgs.lib.genAttrs systems (system:
+          packages = with nixpkgs.legacyPackages.${system}; [
+            nixfmt
+            ruff
+            statix
+          ];
+        };
+      });
+
+      packages = nixpkgs.lib.genAttrs systems (
+        system:
         let
-          package = nixpkgs.legacyPackages.${system}.python313.pkgs.callPackage ./nix/teraflops.nix {};
+          package = nixpkgs.legacyPackages.${system}.python313.pkgs.callPackage ./nix/teraflops.nix { };
         in
         {
           default = package;

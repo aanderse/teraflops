@@ -5,7 +5,8 @@
     teraflops.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { nixpkgs, teraflops, ... }:
+  outputs =
+    { nixpkgs, teraflops, ... }:
     let
       system = "x86_64-linux";
 
@@ -15,16 +16,21 @@
       };
     in
     {
-      devShells.${system}.default = with pkgs;
+      devShells.${system}.default =
+        with pkgs;
         mkShell {
           pname = "teraflops-virtualbox";
 
           packages = [
-            (terraform.withPlugins (p: [ p.tls p.virtualbox ]))
+            (terraform.withPlugins (p: [
+              p.tls
+              p.virtualbox
+            ]))
             teraflops.packages.${system}.default
           ];
         };
-    } // {
+    }
+    // {
       teraflops = {
         imports = [ teraflops.modules.virtualbox ];
 
@@ -32,7 +38,7 @@
           nixpkgs = nixpkgs.legacyPackages.${system};
         };
 
-        defaults = { ... }: {
+        defaults = {
           deployment.targetEnv = "virtualbox";
           deployment.virtualbox = {
             cpus = 2;
@@ -42,9 +48,11 @@
           system.stateVersion = "25.05";
         };
 
-        machine = { pkgs, ... }: {
-          environment.systemPackages = [ pkgs.hello ];
-        };
+        machine =
+          { pkgs, ... }:
+          {
+            environment.systemPackages = [ pkgs.hello ];
+          };
       };
     };
 }

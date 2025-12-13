@@ -5,7 +5,8 @@
     teraflops.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { nixpkgs, teraflops, ... }:
+  outputs =
+    { nixpkgs, teraflops, ... }:
     let
       system = "x86_64-linux";
 
@@ -15,16 +16,22 @@
       };
     in
     {
-      devShells.${system}.default = with pkgs;
+      devShells.${system}.default =
+        with pkgs;
         mkShell {
           pname = "teraflops-digitalocean";
 
           packages = [
-            (terraform.withPlugins (p: [ p.digitalocean p.ssh p.tls ]))
+            (terraform.withPlugins (p: [
+              p.digitalocean
+              p.ssh
+              p.tls
+            ]))
             teraflops.packages.${system}.default
           ];
         };
-    } // {
+    }
+    // {
       teraflops = {
         imports = [ teraflops.modules.digitalocean ];
 
@@ -32,7 +39,7 @@
           nixpkgs = nixpkgs.legacyPackages.${system};
         };
 
-        defaults = { ... }: {
+        defaults = {
           deployment.targetEnv = "digitalocean";
           deployment.digitalocean = {
             region = "fra1";
@@ -42,15 +49,17 @@
           system.stateVersion = "25.05";
         };
 
-        machine = { pkgs, ... }: {
-          fileSystems."/storage" = {
-            fsType = "ext4";
-            label = "storage";
-            digitalocean.size = 10;
-          };
+        machine =
+          { pkgs, ... }:
+          {
+            fileSystems."/storage" = {
+              fsType = "ext4";
+              label = "storage";
+              digitalocean.size = 10;
+            };
 
-          environment.systemPackages = [ pkgs.hello ];
-        };
+            environment.systemPackages = [ pkgs.hello ];
+          };
       };
     };
 }
