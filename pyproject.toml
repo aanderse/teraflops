@@ -11,7 +11,7 @@ authors = [
 description = "teraflops - a terraform ops tool which is sure to be a flop"
 version = "0.1.1"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 dependencies = [
   "rich"
 ]
@@ -20,4 +20,6 @@ dependencies = [
 teraflops = "teraflops.main:run"
 
 [tool.setuptools.packages.find]
-include = ["teraflops"]
+include = ["teraflops", "teraflops.*"]
+
+[tool.setuptools_scm]
