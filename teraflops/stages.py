@@ -44,7 +44,7 @@ async def eval(console, name, terraform_json):
     if len(lines) > 0:
       console.update(msg, f'evaluation failed: {lines[-1].strip()}', status='failure')
     else:
-      console.update(msg, f'evaluation failed: an expected failure occurred', status='failure')
+      console.update(msg, f'evaluation failed: an unexpected failure occurred', status='failure')
 
     raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
