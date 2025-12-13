@@ -11,7 +11,7 @@ async def run(args):
     cmd = [
       'nix',
       'repl',
-      '--experimental-features', 'flakes nix-command',
+      '--extra-experimental-features', 'flakes nix-command',
       '--expr', f'with import {eval_path} {{ flake = builtins.getFlake (toString ./.); terraform_json = {terraform_json}; }}; repl'
     ]
     if args.debugger:
