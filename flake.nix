@@ -2,28 +2,37 @@
   description = "teraflops - a terraform ops tool which is sure to be a flop";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
-        packages.teraflops = self.packages.${system}.default;
-
-        packages.default = pkgs.python313.pkgs.callPackage ./nix/teraflops.nix {};
-
-        devShells.default = with pkgs;
-          mkShell {
+  outputs = { self, nixpkgs }:
+    let
+      systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-darwin" "x86_64-linux" ];
+    in
+    {
+      devShells = nixpkgs.lib.genAttrs systems (system:
+        let
+          package = nixpkgs.legacyPackages.${system}.python313.pkgs.callPackage ./nix/teraflops.nix {};
+        in
+        {
+          default = nixpkgs.legacyPackages.${system}.mkShell {
             pname = "teraflops";
 
             inputsFrom = [ self.packages.${system}.default ];
           };
-      }
-    ) // {
+        }
+      );
+
+      packages = nixpkgs.lib.genAttrs systems (system:
+        let
+          package = nixpkgs.legacyPackages.${system}.python313.pkgs.callPackage ./nix/teraflops.nix {};
+        in
+        {
+          default = package;
+          teraflops = package;
+        }
+      );
+
       modules = {
         digitalocean = import ./nix/digitalocean;
         hcloud = import ./nix/hcloud;
