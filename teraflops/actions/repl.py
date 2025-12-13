@@ -2,6 +2,7 @@
 import subprocess
 
 from importlib.resources import files
+from teraflops.paths import nix
 from teraflops.utils import generate_terraform_data_for_nix
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
@@ -9,7 +10,7 @@ eval_path = files('teraflops.nix').joinpath('eval.nix')
 async def run(args):
   async with generate_terraform_data_for_nix() as terraform_json:
     cmd = [
-      'nix',
+      nix(),
       'repl',
       '--extra-experimental-features', 'flakes nix-command',
       '--expr', f'with import {eval_path} {{ flake = builtins.getFlake (toString ./.); terraform_json = {terraform_json}; }}; repl'

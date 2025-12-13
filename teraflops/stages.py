@@ -6,6 +6,7 @@ import os
 from string import Template
 from teraflops import ssh
 from teraflops.error import CalledProcessError
+from teraflops.paths import nix
 
 
 
@@ -91,7 +92,7 @@ async def build(console, name, drv):
 
 async def copy(console, name, deployment, toplevel, private_key=None):
   cmd = [
-    'nix',
+    nix(),
     '--extra-experimental-features', 'flakes nix-command',
     'copy',
     '--to', f'ssh-ng://{deployment["targetUser"]}@{deployment["targetHost"]}?compress=true',
@@ -184,7 +185,7 @@ async def switch_to_configuration(console, name, node, toplevel, target, private
 
 async def upload_keys(console, name, deployment, terraform_json, private_key=None):
   cmd = [
-    'nix',
+    nix(),
     '--extra-experimental-features', 'flakes nix-command',
     'eval',
     '--impure',

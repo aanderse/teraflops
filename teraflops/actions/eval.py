@@ -4,6 +4,7 @@ import contextlib
 
 from teraflops.console import Console
 from teraflops.error import CalledProcessError
+from teraflops.paths import nix
 from teraflops.utils import generate_terraform_data_for_nix
 
 
@@ -28,7 +29,7 @@ async def run(args):
     if args.raw:
       cmd_args += ['--raw']
 
-    process = await asyncio.create_subprocess_exec('nix', *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(nix(), *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     return process.returncode, stdout, stderr

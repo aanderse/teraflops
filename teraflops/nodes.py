@@ -3,6 +3,7 @@ import asyncio
 import json
 
 from teraflops import utils
+from teraflops.paths import nix
 from teraflops.paths import terraform
 from teraflops.error import CalledProcessError
 
@@ -60,7 +61,7 @@ async def filter(args):
       f'(import {eval_path} {{ flake = builtins.getFlake (toString ./.); }}).nodes."{name}".config.deployment.tags'
     ]
 
-    process = await asyncio.create_subprocess_exec('nix', *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(nix(), *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
@@ -95,7 +96,7 @@ async def filter(args):
 
 async def get_nodes_names():
   cmd = [
-    'nix',
+    nix(),
     '--extra-experimental-features', 'flakes nix-command',
     'eval',
     '--impure',
