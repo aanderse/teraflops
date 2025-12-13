@@ -23,31 +23,31 @@ async def run(args):
       toplevel = await stages.build(console, name, drv)
       await stages.copy(console, name, deployment, toplevel, private_key)
 
-      if not args.no_keys and not args.dry_run:
+      if not args.no_keys and args.flag in ('reboot', 'switch', 'test',):
         await stages.upload_keys(console, name, deployment, terraform_json, private_key)
 
-      if args.reboot:
-        target = 'boot'
-      elif args.dry_run:
-        target = 'dry-activate'
-      else:
-        target = 'switch'
-
-      if target == 'boot' or target == 'switch':
+      if args.flag in ('boot', 'reboot', 'switch',):
         await stages.switch_profile(console, name, deployment, toplevel, private_key)
 
-      await stages.switch_to_configuration(console, name, deployment, toplevel, target, private_key)
+      if args.flag in ('boot', 'reboot',):
+        await stages.switch_to_configuration(console, name, deployment, toplevel, 'boot', private_key)
+      elif args.flag in ('switch',):
+        await stages.switch_to_configuration(console, name, deployment, toplevel, 'switch', private_key)
+      elif args.flag in ('test',):
+        await stages.switch_to_configuration(console, name, deployment, toplevel, 'test', private_key)
+      elif args.flag in ('dry_run',):
+        await stages.switch_to_configuration(console, name, deployment, toplevel, 'dry-activate', private_key)
 
       # TODO: upload post activation keys
 
-      if args.reboot:
+      if args.flag in ('reboot',):
         value = await stages.reboot(console, name, deployment, private_key=private_key)
 
         if not args.no_keys:
           await stages.upload_keys(console, name, deployment, terraform_json, private_key)
       else:
         # TODO: this becomes redundant once we upload post activation keys
-        if not args.no_keys and not args.dry_run:
+        if not args.no_keys and args.flag not in  ('dry_run', ):
           await stages.upload_keys(console, name, deployment, terraform_json, private_key)
     except CalledProcessError as e:
       errors[name] = e
@@ -94,5 +94,10 @@ def register_action(subparsers):
   parser.set_defaults(func=run)
 
   group = parser.add_mutually_exclusive_group()
-  group.add_argument('--reboot', action='store_true', help='reboots nodes after activation and waits for them to come back up')
-  group.add_argument('--dry-run', action='store_true', help='show what changes would be performed by the activation')
+  group.add_argument('--boot', action='store_const', dest='flag', const='boot', help='activate nodes on the next reboot')
+  group.add_argument('--reboot', action='store_const', dest='flag', const='reboot', help='reboots nodes, activate, and wait for the nodes to come back up')
+  group.add_argument('--test', action='store_const', dest='flag', const='test', help='build and activate the new configuration without making it the default on boot')
+  group.add_argument('--switch', action='store_const', dest='flag', const='switch', help='build and activate the new configuration making it the default on boot')
+  group.add_argument('--dry-run', action='store_const', dest='flag', const='dry_run', help='show what changes would be performed by the activation')
+
+  parser.set_defaults(flag='switch')
