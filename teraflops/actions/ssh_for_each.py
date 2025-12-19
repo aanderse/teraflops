@@ -8,7 +8,7 @@ from teraflops.console import Console
 async def run(args):
     console = Console(args.verbose)
 
-    async def doit(console, name, node, command, private_key):
+    async def execute_on_node(console, name, node, command, private_key):
         msg = console.message(name)
 
         if args.verbose:
@@ -38,7 +38,7 @@ async def run(args):
     with console.refresh(), ssh.get_private_key(output_data) as private_key:
         async with asyncio.TaskGroup() as tg:
             for name in selected:
-                tg.create_task(doit(console, name, output_data['nodes'][name], args.command, private_key))
+                tg.create_task(execute_on_node(console, name, output_data['nodes'][name], args.command, private_key))
 
 
 def register_action(subparsers):

@@ -11,7 +11,7 @@ async def run(args):
     errors = {}
     console = Console(args.verbose)
 
-    async def pipeline(console, name, deployment, terraform_json, private_key):
+    async def reboot_node(console, name, deployment, terraform_json, private_key):
         try:
             await stages.reboot(console, name, deployment, no_wait=args.no_wait, private_key=private_key)
 
@@ -37,7 +37,7 @@ async def run(args):
 
             async with asyncio.TaskGroup() as tg:
                 for name in selected:
-                    tg.create_task(pipeline(console, name, output_data['nodes'][name], terraform_json, private_key))
+                    tg.create_task(reboot_node(console, name, output_data['nodes'][name], terraform_json, private_key))
 
 
 def register_action(subparsers):

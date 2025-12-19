@@ -12,7 +12,7 @@ async def run(args):
     errors = {}
     console = Console(args.verbose)
 
-    async def pipeline(console, name, node, terraform_json, private_key):
+    async def upload_keys_to_node(console, name, node, terraform_json, private_key):
         try:
             await stages.upload_keys(console, name, node, terraform_json, private_key)
         except CalledProcessError as e:
@@ -33,7 +33,7 @@ async def run(args):
             console.info('terraform data gathered, ready to do work')
             async with asyncio.TaskGroup() as tg:
                 for name in selected:
-                    tg.create_task(pipeline(console, name, output_data['nodes'][name], terraform_json, private_key))
+                    tg.create_task(upload_keys_to_node(console, name, output_data['nodes'][name], terraform_json, private_key))
 
     for name, e in errors.items():
         console.error(f'failed to upload keys to {name} - logs:')

@@ -7,7 +7,7 @@ from teraflops.console import Console
 async def run(args):
     console = Console(args.verbose)
 
-    async def doit(console, name, node, command, private_key):
+    async def execute_on_node(console, name, node, command, private_key):
         # TODO: too verbose?
         msg = console.message(name, f'executing {command} on {node["targetHost"]}')
 
@@ -29,7 +29,7 @@ async def run(args):
     with console.refresh(), ssh.get_private_key(output_data) as private_key:
         async with asyncio.TaskGroup() as tg:
             for name, deployment in output_data['nodes'].items():
-                tg.create_task(doit(console, name, deployment, ['uptime'], private_key))
+                tg.create_task(execute_on_node(console, name, deployment, ['uptime'], private_key))
 
 
 def register_action(subparsers):

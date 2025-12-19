@@ -37,7 +37,7 @@ async def run(args):
     errors = {}
     console = Console(args.verbose)
 
-    async def pipeline(console, name, deployment, terraform_json, private_key):
+    async def deploy_node(console, name, deployment, terraform_json, private_key):
         try:
             await wait_for_node(console, name, node, private_key)
 
@@ -93,7 +93,7 @@ async def run(args):
             async with asyncio.TaskGroup() as tg:
                 for name, node in output_data['nodes'].items():
                     if name in selected:
-                        tg.create_task(pipeline(console, name, node, terraform_json, private_key))
+                        tg.create_task(deploy_node(console, name, node, terraform_json, private_key))
 
     for name, e in errors.items():
         console.error(f'failed to deploy {name} - logs:')

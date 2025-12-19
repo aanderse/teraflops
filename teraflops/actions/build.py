@@ -14,7 +14,7 @@ async def run(args):
     errors = {}
     console = Console(args.verbose)
 
-    async def pipeline(console, name, terraform_json, drv):
+    async def build_node(console, name, terraform_json, drv):
         try:
             if drv is None:
                 drv = await stages.eval(console, name, terraform_json)
@@ -41,7 +41,7 @@ async def run(args):
 
             async with asyncio.TaskGroup() as tg:
                 for name in selected:
-                    tg.create_task(pipeline(console, name, terraform_json, drvs[name] if args.with_drvs else None))
+                    tg.create_task(build_node(console, name, terraform_json, drvs[name] if args.with_drvs else None))
 
     for name, e in errors.items():
         console.error(f'failed to build to {name} - logs:')

@@ -13,7 +13,7 @@ async def run(args):
     errors = {}
     console = Console(args.verbose)
 
-    async def pipeline(console, name, deployment, terraform_json, drv, private_key):
+    async def activate_node(console, name, deployment, terraform_json, drv, private_key):
         try:
             if drv is None:
                 drv = await stages.eval(console, name, terraform_json)
@@ -82,7 +82,7 @@ async def run(args):
                 for name, deployment in output_data['nodes'].items():
                     if name in selected:
                         tg.create_task(
-                            pipeline(
+                            activate_node(
                                 console,
                                 name,
                                 deployment,
