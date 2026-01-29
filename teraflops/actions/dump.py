@@ -2,8 +2,8 @@ from teraflops.utils import generate_full_terraform_config
 
 
 async def run(args):
-    async with generate_full_terraform_config():
-        with open('main.tf.json') as f:
+    async with generate_full_terraform_config() as config_file:
+        with open(config_file) as f:
             print(f.read())
 
 

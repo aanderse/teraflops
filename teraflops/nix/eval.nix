@@ -30,7 +30,7 @@ let
       # `terraform.json` is a slightly processed version of `terraform show -json` produced by `teraflops` for consumption here
       value =
         with builtins;
-        lib.optionalAttrs (terraform_json != null) (fromJSON (readFile terraform_json));
+        lib.optionalAttrs (terraform_json != null) (builtins.fromJSON (builtins.readFile terraform_json));
     in
     {
       outputs = value.outputs or null;

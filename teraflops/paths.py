@@ -1,3 +1,4 @@
+import hashlib
 import os
 import shutil
 import subprocess
@@ -5,6 +6,17 @@ import subprocess
 
 class BinaryNotFoundError(Exception):
     pass
+
+
+def terraform_config_file():
+    """Return a deterministic terraform config filename based on the current working directory.
+
+    Uses a hash of the cwd to avoid conflicts with user files while remaining
+    deterministic for caching purposes.
+    """
+    cwd = os.getcwd()
+    project_id = hashlib.sha256(cwd.encode()).hexdigest()[:12]
+    return f'teraflops.{project_id}.tf.json'
 
 
 def flake_ref():

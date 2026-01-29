@@ -9,7 +9,7 @@ import tempfile
 from importlib.resources import files
 
 from teraflops.error import CalledProcessError
-from teraflops.paths import flake_ref, nix, terraform
+from teraflops.paths import flake_ref, nix, terraform, terraform_config_file
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
@@ -39,20 +39,21 @@ async def generate_full_terraform_config():
 
     tf_json = stdout.strip()
 
-    # keep a cached copy of main.tf.json
+    # keep a cached copy of the terraform config
     os.makedirs(tf_data_dir, exist_ok=True)
     shutil.copy(tf_json, tf_cache_file)
     os.chmod(tf_cache_file, 0o664)
 
-    # make main.tf.json available to terraform
-    shutil.copy(tf_json, 'main.tf.json')
-    os.chmod('main.tf.json', 0o664)
+    # make terraform config available to terraform
+    config_file = terraform_config_file()
+    shutil.copy(tf_json, config_file)
+    os.chmod(config_file, 0o664)
 
     try:
-        yield
+        yield config_file
     finally:
         with contextlib.suppress(FileNotFoundError):
-            os.remove('main.tf.json')
+            os.remove(config_file)
 
 
 @contextlib.asynccontextmanager
@@ -85,13 +86,14 @@ async def generate_minimal_terraform_config(use_cache_if_available=True):
         shutil.copy(tf_json, tf_cache_file)
         os.chmod(tf_cache_file, 0o664)
 
-    shutil.copy(tf_cache_file, 'main.tf.json')
+    config_file = terraform_config_file()
+    shutil.copy(tf_cache_file, config_file)
 
     try:
-        yield
+        yield config_file
     finally:
         with contextlib.suppress(FileNotFoundError):
-            os.remove('main.tf.json')
+            os.remove(config_file)
 
 
 @contextlib.asynccontextmanager
