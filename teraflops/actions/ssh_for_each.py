@@ -2,17 +2,17 @@ import argparse
 import asyncio
 
 from teraflops import nodes, parsers, ssh
-from teraflops.console import Console
+from teraflops.console import Console, Status
 
 
 async def run(args):
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def execute_on_node(console, name, node, command, private_key):
-        msg = console.message(name)
+    async def execute_on_node(ctx, name, node, command, private_key):
+        msg = ctx.message(name)
 
-        if args.verbose:
-            console.update(msg, 'executing remote command')
+        if args.verbose >= 1:
+            msg.update('executing remote command')
 
         process = await asyncio.create_subprocess_exec(
             *ssh.cmd(node, command, private_key=private_key),
@@ -22,9 +22,9 @@ async def run(args):
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
-            console.update(msg, f'failed: {stderr.decode().strip()}', status='failure')
+            msg.update(f'failed: {stderr.decode().strip()}', status=Status.FAILURE)
         else:
-            console.update(msg, stdout.decode().strip(), status='success')
+            msg.update(stdout.decode().strip(), status=Status.SUCCESS)
 
     output_data = await nodes.get_teraflops_data()
 
@@ -35,10 +35,10 @@ async def run(args):
     else:
         console.info(f'selected {len(selected)} out of {len(all)} hosts')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         async with asyncio.TaskGroup() as tg:
             for name in selected:
-                tg.create_task(execute_on_node(console, name, output_data['nodes'][name], args.command, private_key))
+                tg.create_task(execute_on_node(ctx, name, output_data['nodes'][name], args.command, private_key))
 
 
 def register_action(subparsers):

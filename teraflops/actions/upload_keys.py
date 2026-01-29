@@ -10,11 +10,11 @@ from teraflops.utils import generate_terraform_data_for_nix
 
 async def run(args):
     errors = {}
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def upload_keys_to_node(console, name, node, terraform_json, private_key):
+    async def upload_keys_to_node(ctx, name, node, terraform_json, private_key):
         try:
-            await stages.upload_keys(console, name, node, terraform_json, private_key)
+            await stages.upload_keys(ctx, name, node, terraform_json, private_key)
         except CalledProcessError as e:
             errors[name] = e
 
@@ -28,12 +28,13 @@ async def run(args):
     output_data = await nodes.get_teraflops_data()
     console.info('teraflops data gathered')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         async with generate_terraform_data_for_nix() as terraform_json:
             console.info('terraform data gathered, ready to do work')
             async with asyncio.TaskGroup() as tg:
                 for name in selected:
-                    tg.create_task(upload_keys_to_node(console, name, output_data['nodes'][name], terraform_json, private_key))
+                    node = output_data['nodes'][name]
+                    tg.create_task(upload_keys_to_node(ctx, name, node, terraform_json, private_key))
 
     for name, e in errors.items():
         console.error(f'failed to upload keys to {name} - logs:')

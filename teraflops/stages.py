@@ -5,13 +5,14 @@ from importlib.resources import files
 from string import Template
 
 from teraflops import ssh
+from teraflops.console import Status
 from teraflops.error import CalledProcessError
 from teraflops.paths import nix
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 
-async def eval(console, name, terraform_json):
+async def eval(ctx, name, terraform_json):
     cmd = [
         'nix-instantiate',
         '--json',
@@ -26,7 +27,7 @@ async def eval(console, name, terraform_json):
         terraform_json,
     ]
 
-    msg = console.message(name, f'evaluating {name}')
+    msg = ctx.message(name, f'evaluating {name}')
 
     env = {}
     process = await asyncio.create_subprocess_exec(
@@ -40,32 +41,32 @@ async def eval(console, name, terraform_json):
         stderr += data
         line = data.decode('utf-8').rstrip()
 
-        console.update(msg, line)
+        msg.update(line)
 
     stdout, _ = await process.communicate()
 
     if process.returncode != 0:
         lines = stderr.decode().rstrip().splitlines()
         if len(lines) > 0:
-            console.update(msg, f'evaluation failed: {lines[-1].strip()}', status='failure')
+            msg.update(f'evaluation failed: {lines[-1].strip()}', status=Status.FAILURE)
         else:
-            console.update(msg, 'evaluation failed: an unexpected failure occurred', status='failure')
+            msg.update('evaluation failed: an unexpected failure occurred', status=Status.FAILURE)
 
         raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
     toplevel = stdout.decode().strip()
-    console.update(msg, f'evaluated {toplevel}', status='success')
+    msg.update(f'evaluated {toplevel}', status=Status.SUCCESS)
     return toplevel
 
 
-async def build(console, name, drv):
+async def build(ctx, name, drv):
     cmd = [
         'nix-build',
         '--no-out-link',
         drv,
     ]
 
-    msg = console.message(name, f'building {name}')
+    msg = ctx.message(name, f'building {name}')
 
     env = {}
     process = await asyncio.create_subprocess_exec(
@@ -79,26 +80,26 @@ async def build(console, name, drv):
         stderr += data
         line = data.decode('utf-8').rstrip()
 
-        console.update(msg, line)
+        msg.update(line)
 
     stdout, _ = await process.communicate()
 
     if process.returncode != 0:
         lines = stderr.decode().rstrip().splitlines()
         if len(lines) > 0:
-            console.update(msg, f'build failed: {lines[-1].strip()}', status='failure')
+            msg.update(f'build failed: {lines[-1].strip()}', status=Status.FAILURE)
         else:
-            console.update(msg, 'build failed: an unexpected failure occurred', status='failure')
+            msg.update('build failed: an unexpected failure occurred', status=Status.FAILURE)
 
         raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
     toplevel = stdout.decode().strip()
-    console.update(msg, f'built {toplevel}', status='success')
+    msg.update(f'built {toplevel}', status=Status.SUCCESS)
 
     return toplevel
 
 
-async def copy(console, name, deployment, toplevel, private_key=None):
+async def copy(ctx, name, deployment, toplevel, private_key=None):
     cmd = [
         nix(),
         '--extra-experimental-features',
@@ -112,7 +113,7 @@ async def copy(console, name, deployment, toplevel, private_key=None):
         '--verbose',
     ]
 
-    msg = console.message(name, 'pushing system closure')
+    msg = ctx.message(name, 'pushing system closure')
 
     env = {'NIX_SSHOPTS': ' '.join(ssh.opts(deployment, private_key=private_key))}
 
@@ -127,22 +128,22 @@ async def copy(console, name, deployment, toplevel, private_key=None):
         stderr += data
         line = data.decode('utf-8').rstrip()
 
-        console.update(msg, line)
+        msg.update(line)
 
     await process.wait()
 
     if process.returncode != 0:
         lines = stderr.decode().rstrip().splitlines()
-        # console.info(f'{name} -> len: {len(lines)}, value: "{stderr.decode()}"')
-        console.update(msg, f'push failed: {lines[-1].strip()}', status='failure')
+        # ctx.info(f'{name} -> len: {len(lines)}, value: "{stderr.decode()}"')
+        msg.update(f'push failed: {lines[-1].strip()}', status=Status.FAILURE)
 
         raise CalledProcessError(process.returncode, stderr=stderr)
 
-    console.update(msg, 'pushed system closure', status='success')
+    msg.update('pushed system closure', status=Status.SUCCESS)
 
 
-async def switch_profile(console, name, node, toplevel, private_key=None):
-    msg = console.message(name, 'switching system profile')
+async def switch_profile(ctx, name, node, toplevel, private_key=None):
+    msg = ctx.message(name, 'switching system profile')
 
     cmd = ssh.cmd(node, ['nix-env', '-p', '/nix/var/nix/profiles/system', '--set', toplevel], private_key=private_key)
 
@@ -155,19 +156,19 @@ async def switch_profile(console, name, node, toplevel, private_key=None):
         stdout += data
         line = data.decode('utf-8').rstrip()
 
-        console.update(msg, line)
+        msg.update(line)
 
     _, stderr = await process.communicate()
 
     if process.returncode != 0:  # done, error
-        console.update(msg, f'switching profile failed: {stderr.decode().strip()}', status='failure')
+        msg.update(f'switching profile failed: {stderr.decode().strip()}', status=Status.FAILURE)
         raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
-    console.update(msg, 'switching profile successful', status='success')
+    msg.update('switching profile successful', status=Status.SUCCESS)
 
 
-async def switch_to_configuration(console, name, node, toplevel, target, private_key=None):
-    msg = console.message(name, 'activating system profile')
+async def switch_to_configuration(ctx, name, node, toplevel, target, private_key=None):
+    msg = ctx.message(name, 'activating system profile')
 
     cmd = ssh.cmd(node, [f'{toplevel}/bin/switch-to-configuration', target], private_key=private_key)
 
@@ -180,18 +181,18 @@ async def switch_to_configuration(console, name, node, toplevel, target, private
         stdout += data
         line = data.decode('utf-8').rstrip()
 
-        console.update(msg, line)
+        msg.update(line)
 
     _, stderr = await process.communicate()
 
     if process.returncode != 0:  # done, error
-        console.update(msg, f'activation failed: {stderr.decode().strip()}', status='failure')
+        msg.update(f'activation failed: {stderr.decode().strip()}', status=Status.FAILURE)
         raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
-    console.update(msg, 'activation successful', status='success')
+    msg.update('activation successful', status=Status.SUCCESS)
 
 
-async def upload_keys(console, name, deployment, terraform_json, private_key=None):
+async def upload_keys(ctx, name, deployment, terraform_json, private_key=None):
     cmd = [
         nix(),
         '--extra-experimental-features',
@@ -208,19 +209,19 @@ async def upload_keys(console, name, deployment, terraform_json, private_key=Non
         ''',
     ]
 
-    msg = console.message(name, 'uploading keys')
+    msg = ctx.message(name, 'uploading keys')
 
     process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
-        console.update(msg, f'key upload failed: {stderr.decode().strip()}', status='failure')
+        msg.update(f'key upload failed: {stderr.decode().strip()}', status=Status.FAILURE)
         raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
     data = json.loads(stdout)
 
     for key in data.values():
-        console.update(msg, f'uploading {key["name"]}')
+        msg.update(f'uploading {key["name"]}')
         value = Template(files('teraflops').joinpath('key_uploader.template.sh').read_text()).safe_substitute(
             DESTINATION=key['path'],
             USER=key['user'],
@@ -238,13 +239,13 @@ async def upload_keys(console, name, deployment, terraform_json, private_key=Non
         stdout, stderr = await process.communicate(key['text'].encode())
 
         if process.returncode != 0:
-            console.update(msg, f'key upload failed: {stderr}', status='failure')
+            msg.update(f'key upload failed: {stderr}', status=Status.FAILURE)
             raise CalledProcessError(process.returncode, stdout=stdout, stderr=stderr)
 
-    console.update(msg, 'uploaded keys', status='success')
+    msg.update('uploaded keys', status=Status.SUCCESS)
 
 
-async def reboot(console, name, node, no_wait=False, private_key=None):
+async def reboot(ctx, name, node, no_wait=False, private_key=None):
     async def get_boot_id(node):
         extra_args = [
             '-o',
@@ -270,9 +271,9 @@ async def reboot(console, name, node, no_wait=False, private_key=None):
         if proc.returncode == 0 or proc.returncode == 255:
             return stdout.decode()
 
-    msg = console.message(name)
+    msg = ctx.message(name)
 
-    console.update(msg, 'rebooting')
+    msg.update('rebooting')
 
     if no_wait:
         return await initiate_reboot(node)
@@ -281,7 +282,7 @@ async def reboot(console, name, node, no_wait=False, private_key=None):
 
     await initiate_reboot(node)
 
-    console.update(msg, 'waiting for reboot')
+    msg.update('waiting for reboot')
 
     while True:
         new_id = await get_boot_id(node)
@@ -290,4 +291,4 @@ async def reboot(console, name, node, no_wait=False, private_key=None):
 
         await asyncio.sleep(2)
 
-    console.update(msg, 'rebooted', status='success')
+    msg.update('rebooted', status=Status.SUCCESS)

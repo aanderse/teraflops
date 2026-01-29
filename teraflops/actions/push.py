@@ -11,14 +11,14 @@ from teraflops.utils import generate_terraform_data_for_nix
 
 async def run(args):
     errors = {}
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def push_node(console, name, deployment, terraform_json, drv, private_key):
+    async def push_node(ctx, name, deployment, terraform_json, drv, private_key):
         try:
             if drv is None:
-                drv = await stages.eval(console, name, terraform_json)
-            toplevel = await stages.build(console, name, drv)
-            await stages.copy(console, name, deployment, toplevel, private_key)
+                drv = await stages.eval(ctx, name, terraform_json)
+            toplevel = await stages.build(ctx, name, drv)
+            await stages.copy(ctx, name, deployment, toplevel, private_key)
         except Exception as e:
             errors[name] = e
 
@@ -32,7 +32,7 @@ async def run(args):
     output_data = await nodes.get_teraflops_data()
     console.info('teraflops data gathered')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         context = contextlib.nullcontext() if args.with_drvs else generate_terraform_data_for_nix()
         async with context as terraform_json:
             if not args.with_drvs:
@@ -47,7 +47,7 @@ async def run(args):
                     if name in selected:
                         tg.create_task(
                             push_node(
-                                console,
+                                ctx,
                                 name,
                                 deployment,
                                 terraform_json,

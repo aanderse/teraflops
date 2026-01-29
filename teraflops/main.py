@@ -15,7 +15,7 @@ from teraflops.paths import BinaryNotFoundError
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-v', '--verbose', action='count', default=0)
 
     subparsers = parser.add_subparsers(title='subcommands')
 
@@ -41,7 +41,7 @@ async def main():
         except subprocess.CalledProcessError as e:
             sys.exit(e.returncode)
         except CalledProcessError as e:
-            console = Console(args.verbose)
+            console = Console(verbosity=args.verbose)
 
             # https://stackoverflow.com/a/37059682
             value = codecs.escape_decode(e.stderr)[0].decode('utf-8')

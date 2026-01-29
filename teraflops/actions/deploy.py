@@ -4,13 +4,13 @@ import subprocess
 import sys
 
 from teraflops import nodes, parsers, ssh, stages
-from teraflops.console import Console
+from teraflops.console import Console, Status
 from teraflops.error import CalledProcessError
 from teraflops.paths import terraform
 from teraflops.utils import generate_full_terraform_config, generate_terraform_data_for_nix
 
 
-async def wait_for_node(console, name, node, private_key):
+async def wait_for_node(ctx, name, node, private_key):
     msg = None
 
     while True:
@@ -25,45 +25,45 @@ async def wait_for_node(console, name, node, private_key):
             break
 
         if not msg:
-            msg = console.message(name, 'waiting for node to become available')
+            msg = ctx.message(name, 'waiting for node to become available')
 
         await asyncio.sleep(2)
 
     if msg:
-        console.update(msg, 'node is now available', status='success')
+        msg.update('node is now available', status=Status.SUCCESS)
 
 
 async def run(args):
     errors = {}
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def deploy_node(console, name, deployment, terraform_json, private_key):
+    async def deploy_node(ctx, name, deployment, terraform_json, private_key):
         try:
-            await wait_for_node(console, name, node, private_key)
+            await wait_for_node(ctx, name, node, private_key)
 
-            drv = await stages.eval(console, name, terraform_json)
-            toplevel = await stages.build(console, name, drv)
-            await stages.copy(console, name, deployment, toplevel, private_key)
+            drv = await stages.eval(ctx, name, terraform_json)
+            toplevel = await stages.build(ctx, name, drv)
+            await stages.copy(ctx, name, deployment, toplevel, private_key)
 
             if not args.no_keys:
-                await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
 
-            await stages.switch_profile(console, name, deployment, toplevel, private_key)
+            await stages.switch_profile(ctx, name, deployment, toplevel, private_key)
             await stages.switch_to_configuration(
-                console, name, deployment, toplevel, 'boot' if args.reboot else 'switch', private_key
+                ctx, name, deployment, toplevel, 'boot' if args.reboot else 'switch', private_key
             )
 
             # TODO: upload post activation keys
 
             if args.reboot:
-                await stages.reboot(console, name, deployment, private_key=private_key)
+                await stages.reboot(ctx, name, deployment, private_key=private_key)
 
                 if not args.no_keys:
-                    await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                    await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
             else:
                 # TODO: this becomes redundant once we upload post activation keys
                 if not args.no_keys:
-                    await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                    await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
 
         except CalledProcessError as e:
             errors[name] = e
@@ -87,13 +87,13 @@ async def run(args):
     output_data = await nodes.get_teraflops_data()
     console.info('teraflops data gathered')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         async with generate_terraform_data_for_nix() as terraform_json:
             console.info('terraform data gathered, ready to do work')
             async with asyncio.TaskGroup() as tg:
                 for name, node in output_data['nodes'].items():
                     if name in selected:
-                        tg.create_task(deploy_node(console, name, node, terraform_json, private_key))
+                        tg.create_task(deploy_node(ctx, name, node, terraform_json, private_key))
 
     for name, e in errors.items():
         console.error(f'failed to deploy {name} - logs:')

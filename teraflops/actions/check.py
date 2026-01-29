@@ -1,15 +1,15 @@
 import asyncio
 
 from teraflops import nodes, ssh
-from teraflops.console import Console
+from teraflops.console import Console, Status
 
 
 async def run(args):
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def execute_on_node(console, name, node, command, private_key):
+    async def execute_on_node(ctx, name, node, command, private_key):
         # TODO: too verbose?
-        msg = console.message(name, f'executing {command} on {node["targetHost"]}')
+        msg = ctx.message(name, f'executing {command} on {node["targetHost"]}')
 
         process = await asyncio.create_subprocess_exec(
             *ssh.cmd(node, ['uptime'], private_key=private_key),
@@ -19,17 +19,17 @@ async def run(args):
         stdout, _ = await process.communicate()
 
         if process.returncode != 0:
-            console.update(msg, 'unavailable', status='failure')
+            msg.update('unavailable', status=Status.FAILURE)
         else:
-            console.update(msg, stdout.decode().strip(), status='success')
+            msg.update(stdout.decode().strip(), status=Status.SUCCESS)
 
     output_data = await nodes.get_teraflops_data()
     console.info('teraflops data gathered')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         async with asyncio.TaskGroup() as tg:
             for name, deployment in output_data['nodes'].items():
-                tg.create_task(execute_on_node(console, name, deployment, ['uptime'], private_key))
+                tg.create_task(execute_on_node(ctx, name, deployment, ['uptime'], private_key))
 
 
 def register_action(subparsers):

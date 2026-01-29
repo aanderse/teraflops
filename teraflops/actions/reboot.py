@@ -9,14 +9,14 @@ from teraflops.utils import generate_terraform_data_for_nix
 
 async def run(args):
     errors = {}
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def reboot_node(console, name, deployment, terraform_json, private_key):
+    async def reboot_node(ctx, name, deployment, terraform_json, private_key):
         try:
-            await stages.reboot(console, name, deployment, no_wait=args.no_wait, private_key=private_key)
+            await stages.reboot(ctx, name, deployment, no_wait=args.no_wait, private_key=private_key)
 
             if not args.no_keys and not args.no_wait:
-                await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
         except CalledProcessError as e:
             errors[name] = e
 
@@ -30,14 +30,14 @@ async def run(args):
     output_data = await nodes.get_teraflops_data()
     console.info('teraflops data gathered')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         context = contextlib.nullcontext() if args.no_keys or args.no_wait else generate_terraform_data_for_nix()
         async with context as terraform_json:
             console.info('terraform data gathered, ready to do work')
 
             async with asyncio.TaskGroup() as tg:
                 for name in selected:
-                    tg.create_task(reboot_node(console, name, output_data['nodes'][name], terraform_json, private_key))
+                    tg.create_task(reboot_node(ctx, name, output_data['nodes'][name], terraform_json, private_key))
 
 
 def register_action(subparsers):

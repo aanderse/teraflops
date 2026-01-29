@@ -12,13 +12,13 @@ from teraflops.utils import generate_terraform_data_for_nix
 
 async def run(args):
     errors = {}
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def build_node(console, name, terraform_json, drv):
+    async def build_node(ctx, name, terraform_json, drv):
         try:
             if drv is None:
-                drv = await stages.eval(console, name, terraform_json)
-            await stages.build(console, name, drv)
+                drv = await stages.eval(ctx, name, terraform_json)
+            await stages.build(ctx, name, drv)
         except CalledProcessError as e:
             errors[name] = e
 
@@ -29,7 +29,7 @@ async def run(args):
     else:
         console.info(f'selected {len(selected)} out of {len(all)} hosts')
 
-    with console.refresh():
+    with console.refresh() as ctx:
         context = contextlib.nullcontext() if args.with_drvs else generate_terraform_data_for_nix()
         async with context as terraform_json:
             if not args.with_drvs:
@@ -41,7 +41,7 @@ async def run(args):
 
             async with asyncio.TaskGroup() as tg:
                 for name in selected:
-                    tg.create_task(build_node(console, name, terraform_json, drvs[name] if args.with_drvs else None))
+                    tg.create_task(build_node(ctx, name, terraform_json, drvs[name] if args.with_drvs else None))
 
     for name, e in errors.items():
         console.error(f'failed to build to {name} - logs:')

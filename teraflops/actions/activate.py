@@ -11,52 +11,52 @@ from teraflops.utils import generate_terraform_data_for_nix
 
 async def run(args):
     errors = {}
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
-    async def activate_node(console, name, deployment, terraform_json, drv, private_key):
+    async def activate_node(ctx, name, deployment, terraform_json, drv, private_key):
         try:
             if drv is None:
-                drv = await stages.eval(console, name, terraform_json)
-            toplevel = await stages.build(console, name, drv)
-            await stages.copy(console, name, deployment, toplevel, private_key)
+                drv = await stages.eval(ctx, name, terraform_json)
+            toplevel = await stages.build(ctx, name, drv)
+            await stages.copy(ctx, name, deployment, toplevel, private_key)
 
             if not args.no_keys and args.flag in (
                 'reboot',
                 'switch',
                 'test',
             ):
-                await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
 
             if args.flag in (
                 'boot',
                 'reboot',
                 'switch',
             ):
-                await stages.switch_profile(console, name, deployment, toplevel, private_key)
+                await stages.switch_profile(ctx, name, deployment, toplevel, private_key)
 
             if args.flag in (
                 'boot',
                 'reboot',
             ):
-                await stages.switch_to_configuration(console, name, deployment, toplevel, 'boot', private_key)
+                await stages.switch_to_configuration(ctx, name, deployment, toplevel, 'boot', private_key)
             elif args.flag in ('switch',):
-                await stages.switch_to_configuration(console, name, deployment, toplevel, 'switch', private_key)
+                await stages.switch_to_configuration(ctx, name, deployment, toplevel, 'switch', private_key)
             elif args.flag in ('test',):
-                await stages.switch_to_configuration(console, name, deployment, toplevel, 'test', private_key)
+                await stages.switch_to_configuration(ctx, name, deployment, toplevel, 'test', private_key)
             elif args.flag in ('dry_run',):
-                await stages.switch_to_configuration(console, name, deployment, toplevel, 'dry-activate', private_key)
+                await stages.switch_to_configuration(ctx, name, deployment, toplevel, 'dry-activate', private_key)
 
             # TODO: upload post activation keys
 
             if args.flag in ('reboot',):
-                await stages.reboot(console, name, deployment, private_key=private_key)
+                await stages.reboot(ctx, name, deployment, private_key=private_key)
 
                 if not args.no_keys:
-                    await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                    await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
             else:
                 # TODO: this becomes redundant once we upload post activation keys
                 if not args.no_keys and args.flag not in ('dry_run',):
-                    await stages.upload_keys(console, name, deployment, terraform_json, private_key)
+                    await stages.upload_keys(ctx, name, deployment, terraform_json, private_key)
         except CalledProcessError as e:
             errors[name] = e
 
@@ -70,7 +70,7 @@ async def run(args):
     output_data = await nodes.get_teraflops_data()
     console.info('teraflops data gathered')
 
-    with console.refresh(), ssh.get_private_key(output_data) as private_key:
+    with console.refresh() as ctx, ssh.get_private_key(output_data) as private_key:
         async with generate_terraform_data_for_nix() as terraform_json:
             console.info('terraform data gathered, ready to do work')
 
@@ -83,7 +83,7 @@ async def run(args):
                     if name in selected:
                         tg.create_task(
                             activate_node(
-                                console,
+                                ctx,
                                 name,
                                 deployment,
                                 terraform_json,

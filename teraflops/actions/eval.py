@@ -11,7 +11,7 @@ eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 
 async def run(args):
-    console = Console(args.verbose)
+    console = Console(verbosity=args.verbose)
 
     async def nix_eval_expr(nix_expr, terraform_json):
         cmd_args = [
