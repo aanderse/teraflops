@@ -28,7 +28,9 @@ let
   terraform =
     let
       # `terraform.json` is a slightly processed version of `terraform show -json` produced by `teraflops` for consumption here
-      value = lib.optionalAttrs (terraform_json != null) (builtins.fromJSON (builtins.readFile terraform_json));
+      value = lib.optionalAttrs (terraform_json != null) (
+        builtins.fromJSON (builtins.readFile terraform_json)
+      );
     in
     {
       outputs = value.outputs or null;
@@ -49,7 +51,13 @@ let
           default = { };
         };
 
-        # TODO: machines = lib.mkOption { type = with lib.types; attrsOf deferredModule; default = { }; };
+        nodes = lib.mkOption {
+          type = with lib.types; attrsOf deferredModule;
+          default = { };
+          description = ''
+            Attribute set of NixOS machine configurations to be deployed by teraflops.
+          '';
+        };
       }
       // lib.genAttrs [ "module" "terraform" ] (
         value:
@@ -89,7 +97,8 @@ let
           );
 
       config = {
-        _module.freeformType = with lib.types; attrsOf deferredModule; # TODO: drop in favour of `machines` option
+        # allow top-level node definitions for backwards compatibility
+        _module.freeformType = with lib.types; attrsOf deferredModule;
 
         terraform = {
           required_providers = {
@@ -213,10 +222,19 @@ let
 
   ##########################
 
-  machines = builtins.removeAttrs eval.config (builtins.attrNames eval.options);
-
   pkgs = eval.config.meta.nixpkgs;
   evalConfig = import (pkgs.path + "/nixos/lib/eval-config.nix");
+
+  # support both top-level node definitions (legacy) and explicit `nodes` option
+  topLevelNodes = builtins.removeAttrs eval.config (builtins.attrNames eval.options);
+  duplicateNodes = builtins.filter (name: topLevelNodes ? ${name}) (
+    builtins.attrNames eval.config.nodes
+  );
+  declaredNodes =
+    if duplicateNodes != [ ] then
+      throw "node(s) defined both at top-level and under 'nodes': ${lib.concatStringsSep ", " duplicateNodes}"
+    else
+      topLevelNodes // eval.config.nodes;
 
   nodes = lib.mapAttrs (
     name: module:
@@ -239,7 +257,7 @@ let
         }
       ];
     }
-  ) machines;
+  ) declaredNodes;
 in
 {
   inherit nodes;
