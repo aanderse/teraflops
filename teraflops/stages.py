@@ -14,17 +14,19 @@ eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 async def eval(ctx, name, terraform_json):
     cmd = [
-        'nix-instantiate',
-        '--json',
-        eval_path,
-        '-A',
-        f'nodes."{name}".config.system.build.toplevel',
-        '--arg',
-        'flake',
-        flake_ref(),
-        '--argstr',
-        'terraform_json',
-        terraform_json,
+        nix(),
+        '--extra-experimental-features',
+        'flakes nix-command',
+        'eval',
+        '--impure',
+        '--raw',
+        '--expr',
+        f'''
+          (import {eval_path} {{
+            flake = {flake_ref()};
+            terraform_json = "{terraform_json}";
+          }}).nodes."{name}".config.system.build.toplevel.drvPath
+        ''',
     ]
 
     msg = ctx.message(name, f'evaluating {name}')
@@ -61,9 +63,13 @@ async def eval(ctx, name, terraform_json):
 
 async def build(ctx, name, drv):
     cmd = [
-        'nix-build',
-        '--no-out-link',
-        drv,
+        nix(),
+        '--extra-experimental-features',
+        'flakes nix-command',
+        'build',
+        '--no-link',
+        '--print-out-paths',
+        f'{drv}^*',
     ]
 
     msg = ctx.message(name, f'building {name}')

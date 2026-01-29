@@ -9,7 +9,7 @@ import tempfile
 from importlib.resources import files
 
 from teraflops.error import CalledProcessError
-from teraflops.paths import flake_ref, terraform
+from teraflops.paths import flake_ref, nix, terraform
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
@@ -20,15 +20,15 @@ async def generate_full_terraform_config():
     tf_cache_file = os.path.join(tf_data_dir, 'teraflops.json')
 
     process = await asyncio.create_subprocess_exec(
-        'nix-build',
-        '--quiet',
-        '--no-out-link',
-        eval_path,
-        '-A',
-        'terraform',
-        '--arg',
-        'flake',
-        flake_ref(),
+        nix(),
+        '--extra-experimental-features',
+        'flakes nix-command',
+        'build',
+        '--no-link',
+        '--print-out-paths',
+        '--impure',
+        '--expr',
+        f'(import {eval_path} {{ flake = {flake_ref()}; }}).terraform',
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -62,15 +62,15 @@ async def generate_minimal_terraform_config(use_cache_if_available=True):
 
     if not os.path.isfile(tf_cache_file) or not use_cache_if_available:
         process = await asyncio.create_subprocess_exec(
-            'nix-build',
-            '--quiet',
-            '--no-out-link',
-            eval_path,
-            '-A',
-            'bootstrap',
-            '--arg',
-            'flake',
-            flake_ref(),
+            nix(),
+            '--extra-experimental-features',
+            'flakes nix-command',
+            'build',
+            '--no-link',
+            '--print-out-paths',
+            '--impure',
+            '--expr',
+            f'(import {eval_path} {{ flake = {flake_ref()}; }}).bootstrap',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
