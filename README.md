@@ -99,7 +99,7 @@ _NOTE:_ Both `outputs` and `resources` will be `null` when a `teraflops` module 
 - `teraflops` leverages `terraform` for all of this work so as long as a `terraform` backend exists it is near trivial to create a `teraflops` module for it
 
 - `NixOps` development is has lagged for a number of years, though apparently there are [plans](https://github.com/NixOS/nixops/issues/1574#issuecomment-1866651601) to bring it back!
-- `teraflops` is a young project and relies on established software like `colmena`, `terraform`, and `nixos-infect` to provide all major functionality making `teraflops` already quite a capable tool
+- `teraflops` is a young project and relies on established software like `terraform` and `nixos-infect` to provide all major functionality making `teraflops` already quite a capable tool
 
 ## Implementation
 
