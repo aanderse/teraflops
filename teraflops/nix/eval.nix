@@ -28,9 +28,7 @@ let
   terraform =
     let
       # `terraform.json` is a slightly processed version of `terraform show -json` produced by `teraflops` for consumption here
-      value =
-        with builtins;
-        lib.optionalAttrs (terraform_json != null) (builtins.fromJSON (builtins.readFile terraform_json));
+      value = lib.optionalAttrs (terraform_json != null) (builtins.fromJSON (builtins.readFile terraform_json));
     in
     {
       outputs = value.outputs or null;
@@ -94,7 +92,6 @@ let
         _module.freeformType = with lib.types; attrsOf deferredModule; # TODO: drop in favour of `machines` option
 
         terraform = {
-          # TODO: keep this in sync with bootstrap.nix
           required_providers = {
             tls = {
               version = ">= 4.0.4";
@@ -246,8 +243,6 @@ let
 in
 {
   inherit nodes;
-
-  keys = lib.mapAttrs (_: node: node.config.deployment.keys) nodes;
 
   # includes hack to account for provider aliases: https://developer.hashicorp.com/terraform/language/providers/configuration#alias-multiple-provider-configurations
   # equivalent in nix:
