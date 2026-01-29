@@ -71,6 +71,17 @@ in
 {
   options = {
     deployment = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether to include this node in the deployment.
+
+          Set to `false` to exclude a node that is defined in an imported
+          module without removing its definition.
+        '';
+      };
+
       targetHost = lib.mkOption {
         type = with lib.types; nullOr str;
         default = name;

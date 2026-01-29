@@ -227,37 +227,44 @@ let
 
   # support both top-level node definitions (legacy) and explicit `nodes` option
   topLevelNodes = builtins.removeAttrs eval.config (builtins.attrNames eval.options);
-  duplicateNodes = builtins.filter (name: topLevelNodes ? ${name}) (
-    builtins.attrNames eval.config.nodes
-  );
-  declaredNodes =
-    if duplicateNodes != [ ] then
-      throw "node(s) defined both at top-level and under 'nodes': ${lib.concatStringsSep ", " duplicateNodes}"
-    else
-      topLevelNodes // eval.config.nodes;
 
-  nodes = lib.mapAttrs (
-    name: module:
+  # merge all node names from both sources
+  allNodeNames = lib.unique (
+    builtins.attrNames eval.config.nodes ++ builtins.attrNames topLevelNodes
+  );
+
+  allNodes = lib.genAttrs allNodeNames (
+    name:
+    let
+      # collect modules from both sources
+      nodeModules =
+        lib.optionals (eval.config.nodes ? ${name}) [ eval.config.nodes.${name} ]
+        ++ lib.optionals (topLevelNodes ? ${name}) [ topLevelNodes.${name} ];
+    in
     evalConfig {
       modules = [
         eval.config.defaults
-        module
 
         # slimmed down option set from colmena... thanks zhaofeng!
         ./deployment.nix
 
         {
           _module.args = {
-            inherit name nodes;
+            inherit name;
+            nodes = allNodes;
           };
 
           nixpkgs.pkgs = pkgs;
           # nixpkgs.overlays = lib.mkBefore pkgs.overlays;
           # nixpkgs.config = lib.mkBefore pkgs.config;
         }
-      ];
+      ]
+      ++ nodeModules;
     }
-  ) declaredNodes;
+  );
+
+  # filter out nodes with deployment.enable = false
+  nodes = lib.filterAttrs (_: node: node.config.deployment.enable) allNodes;
 in
 {
   inherit nodes;
