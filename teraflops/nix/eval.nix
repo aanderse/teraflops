@@ -188,10 +188,8 @@ let
               networking.hostName = lib.mkDefault name;
 
               users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys =
-                lib.optionals config.deployment.provisionSSHKey
-                  [
-                    terraform.resources.tls_private_key.teraflops.public_key_openssh
-                  ];
+                lib.optionals (config.deployment.provisionSSHKey && terraform.resources ? tls_private_key)
+                  [ terraform.resources.tls_private_key.teraflops.public_key_openssh ];
             };
           };
       };
