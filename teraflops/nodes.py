@@ -4,7 +4,7 @@ from importlib.resources import files
 
 from teraflops import utils
 from teraflops.error import CalledProcessError
-from teraflops.paths import nix, terraform
+from teraflops.paths import flake_ref, nix, terraform
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
@@ -56,7 +56,7 @@ async def filter(args):
             '--expr',
             f'''
               (import {eval_path} {{
-                flake = builtins.getFlake (toString ./.);
+                flake = {flake_ref()};
               }}).nodes."{name}".config.deployment.tags
             ''',
         ]
@@ -103,7 +103,7 @@ async def get_nodes_names():
         '--impure',
         '--json',
         '--expr',
-        f'builtins.attrNames (import {eval_path} {{ flake = builtins.getFlake (toString ./.); }}).nodes',
+        f'builtins.attrNames (import {eval_path} {{ flake = {flake_ref()}; }}).nodes',
     ]
 
     process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)

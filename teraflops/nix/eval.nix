@@ -1,5 +1,5 @@
 {
-  flake ? builtins.getFlake (toString ../..),
+  flake ? builtins.getFlake "git+file://${toString ../..}",
   terraform_json ? null,
 }:
 let

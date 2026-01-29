@@ -9,7 +9,7 @@ import tempfile
 from importlib.resources import files
 
 from teraflops.error import CalledProcessError
-from teraflops.paths import terraform
+from teraflops.paths import flake_ref, terraform
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
@@ -28,7 +28,7 @@ async def generate_full_terraform_config():
         'terraform',
         '--arg',
         'flake',
-        'builtins.getFlake (toString ./.)',
+        flake_ref(),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -70,7 +70,7 @@ async def generate_minimal_terraform_config(use_cache_if_available=True):
             'bootstrap',
             '--arg',
             'flake',
-            'builtins.getFlake (toString ./.)',
+            flake_ref(),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

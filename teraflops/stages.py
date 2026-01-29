@@ -7,7 +7,7 @@ from string import Template
 from teraflops import ssh
 from teraflops.console import Status
 from teraflops.error import CalledProcessError
-from teraflops.paths import nix
+from teraflops.paths import flake_ref, nix
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
@@ -21,7 +21,7 @@ async def eval(ctx, name, terraform_json):
         f'nodes."{name}".config.system.build.toplevel',
         '--arg',
         'flake',
-        'builtins.getFlake (toString ./.)',
+        flake_ref(),
         '--argstr',
         'terraform_json',
         terraform_json,
@@ -203,7 +203,7 @@ async def upload_keys(ctx, name, deployment, terraform_json, private_key=None):
         '--expr',
         f'''
           (import {eval_path} {{
-            flake = builtins.getFlake (toString ./.);
+            flake = {flake_ref()};
             terraform_json = {terraform_json};
           }}).nodes."{name}".config.deployment.keys
         ''',
