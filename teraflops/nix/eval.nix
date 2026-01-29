@@ -139,6 +139,7 @@ let
                 nodes = lib.mapAttrs (_: node: {
                   inherit (node.config.deployment)
                     provisionSSHKey
+                    sshOptions
                     tags
                     targetEnv
                     targetHost

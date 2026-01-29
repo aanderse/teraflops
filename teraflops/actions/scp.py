@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 from teraflops import nodes, ssh
 
@@ -66,9 +67,24 @@ async def run(args):
 
         each_node.append(node)
 
+    # Check for conflicting sshOptions in remote-to-remote transfer
+    if len(each_node) == 2:
+        source_opts = each_node[0].get('sshOptions', [])
+        target_opts = each_node[1].get('sshOptions', [])
+        if source_opts != target_opts:
+            print(
+                'error: remote-to-remote scp with different sshOptions is not supported',
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     with ssh.get_private_key(output_data, *each_node) as private_key:
         if private_key:
             cmd += ['-i', private_key]
+
+        for node in each_node:
+            if node.get('sshOptions'):
+                cmd += node['sshOptions']
 
         cmd += [source, target]
 

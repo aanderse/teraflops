@@ -123,6 +123,15 @@ in
         '';
       };
 
+      sshOptions = lib.mkOption {
+        type = with lib.types; listOf str;
+        default = [ ];
+        description = ''
+          Extra options to pass to SSH when connecting to this node.
+        '';
+        example = [ "-o" "ProxyJump=bastion" ];
+      };
+
       keys = lib.mkOption {
         type = lib.types.attrsOf (lib.types.submodule keyType);
         default = { };

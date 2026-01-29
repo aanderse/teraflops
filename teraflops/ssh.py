@@ -18,6 +18,9 @@ def opts(node, private_key=None):
     if node.get('targetUser'):
         opts += ['-l', node.get('targetUser')]
 
+    if node.get('sshOptions'):
+        opts += node['sshOptions']
+
     return opts
 
 
@@ -47,6 +50,9 @@ def cmd(node, command=None, private_key=None, extra_args=None):
 
     if node.get('targetUser'):
         cmd += ['-l', node.get('targetUser')]
+
+    if node.get('sshOptions'):
+        cmd += node['sshOptions']
 
     cmd += [node['targetHost']]
 
