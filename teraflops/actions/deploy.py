@@ -39,7 +39,7 @@ async def run(args):
 
     async def deploy_node(ctx, name, deployment, terraform_json, private_key):
         try:
-            await wait_for_node(ctx, name, node, private_key)
+            await wait_for_node(ctx, name, deployment, private_key)
 
             drv = await stages.eval(ctx, name, terraform_json)
             toplevel = await stages.build(ctx, name, drv)

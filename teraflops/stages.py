@@ -140,7 +140,6 @@ async def copy(ctx, name, deployment, toplevel, private_key=None):
 
     if process.returncode != 0:
         lines = stderr.decode().rstrip().splitlines()
-        # ctx.info(f'{name} -> len: {len(lines)}, value: "{stderr.decode()}"')
         msg.update(f'push failed: {lines[-1].strip()}', status=Status.FAILURE)
 
         raise CalledProcessError(process.returncode, stderr=stderr)

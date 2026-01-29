@@ -44,7 +44,7 @@ async def run(args):
                     tg.create_task(build_node(ctx, name, terraform_json, drvs[name] if args.with_drvs else None))
 
     for name, e in errors.items():
-        console.error(f'failed to build to {name} - logs:')
+        console.error(f'failed to build {name} - logs:')
 
         # https://stackoverflow.com/a/37059682
         value = codecs.escape_decode(e.stderr)[0].decode('utf-8')

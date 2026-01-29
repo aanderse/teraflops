@@ -6,6 +6,7 @@ import sys
 
 from teraflops import nodes, parsers, ssh, stages
 from teraflops.console import Console
+from teraflops.error import CalledProcessError
 from teraflops.utils import generate_terraform_data_for_nix
 
 
@@ -19,7 +20,7 @@ async def run(args):
                 drv = await stages.eval(ctx, name, terraform_json)
             toplevel = await stages.build(ctx, name, drv)
             await stages.copy(ctx, name, deployment, toplevel, private_key)
-        except Exception as e:
+        except CalledProcessError as e:
             errors[name] = e
 
     console.info('enumerating nodes...')

@@ -78,7 +78,7 @@ class TableTaskHandle:
 
   _table: Table
   _name: str
-  _format_timestamp: callable
+  _format_timestamp: Callable[[], str]
 
   def update(self, text: str, status: Status | None = None) -> None:
     if not text:
