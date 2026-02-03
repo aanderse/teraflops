@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import sys
 from importlib.resources import files
 
 from teraflops.console import Console
@@ -49,7 +50,14 @@ async def run(args):
             if returncode != 0:
                 raise CalledProcessError(returncode, stdout=stdout, stderr=stderr)
 
-            console.print(stdout.strip().decode())
+            # For --json and --raw output, write directly to stdout to avoid any
+            # processing by Rich Console which could corrupt the data
+            if args.json or args.raw:
+                sys.stdout.buffer.write(stdout.strip())
+                sys.stdout.buffer.write(b'\n')
+                sys.stdout.flush()
+            else:
+                console.print(stdout.strip().decode())
 
 
 def register_action(subparsers):
