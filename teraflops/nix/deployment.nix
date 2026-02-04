@@ -18,8 +18,7 @@ let
         };
 
         text = lib.mkOption {
-          type = with lib.types; nullOr str;
-          default = null;
+          type = lib.types.str;
           description = ''
             Content of the key.
           '';
