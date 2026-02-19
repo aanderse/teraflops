@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Protocol
 
 from rich.live import Live
+from rich.markup import escape
 from rich.progress import Progress, ProgressColumn, SpinnerColumn, TextColumn
 from rich.style import Style
 from rich.table import Table
@@ -69,7 +70,7 @@ class TraceTaskHandle:
       node_display = self._name
 
     timestamp_prefix = self._console._format_timestamp()
-    self._console._console.print(f'{timestamp_prefix}[[dim]TRACE[/]] {node_display}: {text}')
+    self._console._console.print(f'{timestamp_prefix}[[dim]TRACE[/]] {node_display}: {escape(text)}')
 
 
 @dataclass
@@ -92,7 +93,7 @@ class TableTaskHandle:
 
     # Add timestamp prefix if enabled
     timestamp_prefix = self._format_timestamp()
-    self._table.add_row(f'{timestamp_prefix}[{markup}]{self._name}', ' | ', text)
+    self._table.add_row(f'{timestamp_prefix}[{markup}]{self._name}', ' | ', escape(text))
 
 
 @dataclass
@@ -108,7 +109,7 @@ class ProgressTaskHandle:
 
     name = self._progress.tasks[self._task_id].fields['node']
 
-    update_args = {'description': text}
+    update_args = {'description': escape(text)}
     if status == Status.SUCCESS:
       update_args['advance'] = 1
       update_args['node'] = f'[bold green]{name}'
@@ -170,7 +171,7 @@ class Console:
 
   def print(self, text: str) -> None:
     """Print unformatted text."""
-    self._console.print(text)
+    self._console.print(text, markup=False)
 
   def trace(self, text: str) -> None:
     """Print a trace message (only shown with -vv or higher)."""
