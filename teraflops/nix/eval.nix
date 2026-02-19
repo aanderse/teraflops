@@ -58,6 +58,18 @@ let
             Attribute set of NixOS machine configurations to be deployed by teraflops.
           '';
         };
+
+        testScript = lib.mkOption {
+          type = with lib.types; nullOr (either str (functionTo str));
+          default = null;
+          description = ''
+            Python test script to run against deployed machines.
+
+            Machines are injected as globals by name.
+            Can be a string or a function that receives
+            `{ nodes, pkgs, lib, resources, outputs }` and returns a string.
+          '';
+        };
       }
       // lib.genAttrs [ "module" "terraform" ] (
         value:
@@ -267,6 +279,20 @@ let
 in
 {
   inherit nodes;
+
+  testScript =
+    let
+      raw = eval.config.testScript;
+    in
+    if raw == null then
+      null
+    else if builtins.isFunction raw then
+      raw {
+        inherit nodes pkgs lib;
+        inherit (terraform) resources outputs;
+      }
+    else
+      raw;
 
   # includes hack to account for provider aliases: https://developer.hashicorp.com/terraform/language/providers/configuration#alias-multiple-provider-configurations
   # equivalent in nix:
