@@ -114,6 +114,10 @@ let
 
         terraform = {
           required_providers = {
+            random = {
+              source = "hashicorp/random";
+              version = ">= 3.0";
+            };
             tls = {
               version = ">= 4.0.4";
             };
@@ -125,14 +129,19 @@ let
           let
             nodes' = lib.filterAttrs (_: node: node.config.deployment.provisionSSHKey) nodes;
           in
-          lib.mkIf (nodes' != { }) {
-            # inject a ssh private key terraform resource if `provisionSSHKey` is set
-            tls_private_key = {
-              teraflops = {
-                algorithm = "ED25519";
+          lib.mkMerge [
+            {
+              random_uuid.teraflops = { };
+            }
+            (lib.mkIf (nodes' != { }) {
+              # inject a ssh private key terraform resource if `provisionSSHKey` is set
+              tls_private_key = {
+                teraflops = {
+                  algorithm = "ED25519";
+                };
               };
-            };
-          };
+            })
+          ];
 
         # `colmena exec` is relatively slow because it needs to do a nix evaluation every time it is run
         # since `teraflops` has state this can be used to speed up the equivalent operation, `teraflops ssh-for-each`
@@ -147,7 +156,7 @@ let
             teraflops = {
               sensitive = true;
               value = {
-                version = 1;
+                version = 2;
                 nodes = lib.mapAttrs (_: node: {
                   inherit (node.config.deployment)
                     provisionSSHKey
@@ -160,6 +169,7 @@ let
                     ;
                 }) nodes;
                 privateKey = if nodes' != { } then "\${tls_private_key.teraflops.private_key_openssh}" else null;
+                uuid = "\${random_uuid.teraflops.id}";
               };
             };
           };
@@ -199,9 +209,9 @@ let
             config = {
               networking.hostName = lib.mkDefault name;
 
-              users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys =
-                lib.optionals (config.deployment.provisionSSHKey && terraform.resources ? tls_private_key)
-                  [ terraform.resources.tls_private_key.teraflops.public_key_openssh ];
+              users.users.${config.deployment.targetUser}.openssh.authorizedKeys.keys = lib.optionals (
+                config.deployment.provisionSSHKey && terraform.resources ? tls_private_key
+              ) [ terraform.resources.tls_private_key.teraflops.public_key_openssh ];
             };
           };
       };
