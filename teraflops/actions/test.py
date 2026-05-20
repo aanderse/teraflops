@@ -13,6 +13,7 @@ from rich.markup import escape
 from teraflops import nodes, ssh
 from teraflops.paths import flake_ref, nix
 from teraflops.testing.machine import Machine, RequestedAssertionFailed, console
+from teraflops.utils import generate_terraform_data_for_nix
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
@@ -60,16 +61,17 @@ def _log_test_failure(test_script, script_name):
     console.print(f'[red]!!! {escape(str(exc))}[/]')
 
 
-async def _eval_nix_test_script(nix_file=None):
+async def _eval_nix_test_script(nix_file=None, terraform_json=None):
     """Evaluate a testScript from nix. If nix_file is given, import and evaluate that file;
     otherwise evaluate the testScript from the flake configuration."""
+    tf_arg = f'terraform_json = {terraform_json};' if terraform_json else ''
     if nix_file:
         abs_path = os.path.abspath(nix_file)
         log.info(f'evaluating test script from {nix_file}...')
-        expr = f'(import {eval_path} {{ flake = {flake_ref()}; }}).evalFn (import {abs_path})'
+        expr = f'(import {eval_path} {{ flake = {flake_ref()}; {tf_arg} }}).evalFn (import {abs_path})'
     else:
         log.info('evaluating testScript...')
-        expr = f'(import {eval_path} {{ flake = {flake_ref()}; }}).testScript'
+        expr = f'(import {eval_path} {{ flake = {flake_ref()}; {tf_arg} }}).testScript'
 
     cmd = [
         nix(),
@@ -112,7 +114,8 @@ async def run(args):
 
     # 1. load test script
     if args.file and args.file.endswith('.nix'):
-        test_script = await _eval_nix_test_script(args.file)
+        async with generate_terraform_data_for_nix() as terraform_json:
+            test_script = await _eval_nix_test_script(args.file, terraform_json)
     elif args.file and args.file.endswith('.py'):
         log.info(f'loading test script from {args.file}...')
         try:
@@ -134,7 +137,8 @@ async def run(args):
         log.error('       { nodes, pkgs, lib, resources, outputs } and returns a string.')
         sys.exit(1)
     else:
-        test_script = await _eval_nix_test_script()
+        async with generate_terraform_data_for_nix() as terraform_json:
+            test_script = await _eval_nix_test_script(terraform_json=terraform_json)
 
     # 2. get node data from terraform state
     log.info('enumerating nodes...')
