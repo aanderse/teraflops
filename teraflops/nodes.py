@@ -45,34 +45,6 @@ async def query_cache(name):
 async def filter(args):
     all_node_names = await get_nodes_names()
 
-    # TODO: is querying tags from nix significantly slower than querying from terraform??
-    async def get_node_tags(name):
-        cmd_args = [
-            '--extra-experimental-features',
-            'flakes nix-command',
-            'eval',
-            '--impure',
-            '--json',
-            '--expr',
-            f'''
-              (import {eval_path} {{
-                flake = {flake_ref()};
-              }}).nodes."{name}".config.deployment.tags
-            ''',
-        ]
-
-        process = await asyncio.create_subprocess_exec(
-            nix(), *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            raise CalledProcessError(process.returncode, stdout, stderr)
-
-        return name, json.loads(stdout)
-
-    #########################################
-
     on = args.on.split(',') if args.on else None
 
     if on is None:
@@ -82,13 +54,19 @@ async def filter(args):
     names_to_check = [value for value in on if not value.startswith('@')]
 
     if tags_to_check:
-        async with asyncio.TaskGroup() as tg:
-            tasks = [tg.create_task(get_node_tags(name)) for name in all_node_names]
-
-        tag_map = dict(task.result() for task in tasks)
+        try:
+            # query tags from terraform state to avoid evaluation
+            teraflops_data = await get_teraflops_data()
+        except CalledProcessError:
+            # without terraform state tags can't be resolved yet
+            tag_map = {}
+        else:
+            tag_map = {name: set(node_data['tags']) for name, node_data in teraflops_data['nodes'].items()}
 
         return [
-            name for name in all_node_names if (name in names_to_check) or (not tags_to_check.isdisjoint(tag_map[name]))
+            name
+            for name in all_node_names
+            if (name in names_to_check) or (not tags_to_check.isdisjoint(tag_map.get(name, set())))
         ], all_node_names
 
     return [name for name in all_node_names if name in names_to_check], all_node_names
