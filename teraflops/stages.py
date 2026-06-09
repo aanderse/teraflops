@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import shlex
 from importlib.resources import files
 from string import Template
 
@@ -121,7 +122,7 @@ async def copy(ctx, name, deployment, toplevel, private_key=None):
 
     msg = ctx.message(name, 'pushing system closure')
 
-    env = {'NIX_SSHOPTS': ' '.join(ssh.opts(deployment, private_key=private_key))}
+    env = {'NIX_SSHOPTS': shlex.join(ssh.opts(deployment, private_key=private_key))}
 
     process = await asyncio.create_subprocess_exec(
         *cmd, env={**os.environ, **env}, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
