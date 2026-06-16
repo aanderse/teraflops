@@ -10,15 +10,21 @@ eval_path = files('teraflops.nix').joinpath('eval.nix')
 
 async def get_teraflops_data():
     async with utils.generate_minimal_terraform_config():
+        # query all outputs rather than the `teraflops` output by
+        # name to avoid issues when state exists but is empty
         process = await asyncio.create_subprocess_exec(
-            terraform(), 'output', '-json', 'teraflops', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            terraform(), 'output', '-json', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
             raise CalledProcessError(process.returncode, stdout, stderr)
 
-        return json.loads(stdout)
+        outputs = json.loads(stdout)
+        if 'teraflops' not in outputs:
+            return {'nodes': {}}
+
+        return outputs['teraflops']['value']
 
 async def filter(args):
     all_node_names = await get_nodes_names()
