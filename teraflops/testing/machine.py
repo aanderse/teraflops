@@ -196,7 +196,7 @@ class Machine:
             cmd += ['-i', self.private_key]
 
         if self.node.get('targetPort'):
-            cmd += ['-P', self.node['targetPort']]
+            cmd += ['-P', str(self.node['targetPort'])]
 
         if os.environ.get('SSH_CONFIG_FILE'):
             cmd += ['-F', os.environ['SSH_CONFIG_FILE']]

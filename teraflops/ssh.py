@@ -13,7 +13,7 @@ def opts(node, private_key=None):
         opts += ['-F', os.environ['SSH_CONFIG_FILE']]
 
     if node.get('targetPort'):
-        opts += ['-p', node['targetPort']]
+        opts += ['-p', str(node['targetPort'])]
 
     if node.get('targetUser'):
         opts += ['-l', node.get('targetUser')]
@@ -46,7 +46,7 @@ def cmd(node, command=None, private_key=None, extra_args=None):
         cmd += ['-F', os.environ['SSH_CONFIG_FILE']]
 
     if node.get('targetPort'):
-        cmd += ['-p', node['targetPort']]
+        cmd += ['-p', str(node['targetPort'])]
 
     if node.get('targetUser'):
         cmd += ['-l', node.get('targetUser')]

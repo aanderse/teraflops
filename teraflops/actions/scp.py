@@ -27,7 +27,7 @@ async def run(args):
         node = output_data['nodes'][source_machine]
 
         if node.get('targetPort'):
-            cmd += ['-P', node['targetPort']]
+            cmd += ['-P', str(node['targetPort'])]
 
         source = ''
         if node.get('targetUser'):
@@ -50,7 +50,7 @@ async def run(args):
         node = output_data['nodes'][target_machine]
 
         if node.get('targetPort'):
-            cmd += ['-P', node['targetPort']]
+            cmd += ['-P', str(node['targetPort'])]
 
         target = ''
         if node.get('targetUser'):
