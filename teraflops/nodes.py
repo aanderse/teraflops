@@ -8,8 +8,6 @@ from teraflops.paths import flake_ref, nix, terraform
 
 eval_path = files('teraflops.nix').joinpath('eval.nix')
 
-
-# the only thing this is (currently?) used for is get_teraflops_data()['nodes']
 async def get_teraflops_data():
     async with utils.generate_minimal_terraform_config():
         process = await asyncio.create_subprocess_exec(
@@ -21,26 +19,6 @@ async def get_teraflops_data():
             raise CalledProcessError(process.returncode, stdout, stderr)
 
         return json.loads(stdout)
-
-
-# on `terraform apply` various pieces of information from each nodes `config.deployment.*` configuration is stored in
-# terraform state - this information provides an extremely quick lookup which entirely bypasses nix evaluation
-async def query_cache(name):
-    async with utils.generate_minimal_terraform_config():
-        process = await asyncio.create_subprocess_exec(
-            terraform(), 'output', '-json', 'teraflops', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            raise CalledProcessError(process.returncode, stdout, stderr)
-
-        # FIXME: guard against nodes which aren't there
-        return json.loads(stdout)['nodes'][name]
-
-
-############################################################
-
 
 async def filter(args):
     all_node_names = await get_nodes_names()
