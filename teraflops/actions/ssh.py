@@ -1,3 +1,4 @@
+import argparse
 import difflib
 import subprocess
 
@@ -12,7 +13,7 @@ async def run(args):
         node = output_data['nodes'][args.node]
 
         with ssh.get_private_key(output_data, node) as private_key:
-            subprocess.run(ssh.cmd(node, private_key=private_key))
+            subprocess.run(ssh.cmd(node, args.command or None, private_key=private_key))
     else:
         matches = difflib.get_close_matches(args.node, available, n=5, cutoff=0.6)
 
@@ -26,3 +27,4 @@ def register_action(subparsers):
     parser = subparsers.add_parser('ssh', help='login on the specified machine via SSH')
     parser.set_defaults(func=run)
     parser.add_argument('node', type=str, help='identifier of the node')
+    parser.add_argument('command', nargs=argparse.REMAINDER, help='command to run')
