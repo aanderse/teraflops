@@ -37,6 +37,8 @@ let
       resources = value.resources or null;
     };
 
+  uuid = terraform.resources.random_uuid.teraflops.id or "\${random_uuid.teraflops.id}";
+
   module =
     { lib, ... }:
     {
@@ -221,6 +223,7 @@ let
     modules = [
       module
       {
+        _module.args.uuid = uuid;
         _module.args.tf = {
           mkAlias = alias: attrs: {
             __aliases = {
@@ -299,6 +302,7 @@ in
     else if builtins.isFunction raw then
       raw {
         inherit nodes pkgs lib;
+        inherit uuid;
         inherit (terraform) resources outputs;
       }
     else
@@ -363,6 +367,7 @@ in
     if builtins.isFunction fnOrExpr then
       fnOrExpr {
         inherit (terraform) resources outputs;
+        inherit uuid;
         inherit nodes pkgs lib;
       }
     else
@@ -370,6 +375,7 @@ in
 
   repl = {
     inherit (terraform) resources outputs;
+    inherit uuid;
     inherit nodes pkgs lib;
   };
 }

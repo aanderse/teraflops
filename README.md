@@ -71,6 +71,7 @@ In addition to the regular `nix` module inputs the following arguments are avail
 - `outputs`: The fully evaluated [terraform output values](https://developer.hashicorp.com/terraform/language/values/outputs). Generally these aren't as useful in `teraflops` as they are in `terraform` because the `teraflops eval` command has full access to a `resources` argument which accounts for _most_ use cases in `terraform`.
 - `resources`: The fully evaluated `terraform` resource set, which includes `resource`, `data`, `module`, etc... objects representing the full state of your deployment.
 - `tf`: A minor helper which is most useful for the `tf.ref` function it contains which is used to create `terraform` references, just like in [terranix](https://terranix.org/news/2023-05-24_release-2.6.0.html).
+- `uuid`: A stable per-deploy UUID (sourced from the `random_uuid.teraflops` resource), useful for naming things like buckets. When generating `terraform` code it resolves to a reference to the resource, and when consuming state it resolves to the actual value, so `uuid` works in both contexts.
 
 _NOTE:_ Both `outputs` and `resources` will be `null` when a `teraflops` module is evaluated for the purpose of generating `terraform` code in order to avoid recursion.
 
