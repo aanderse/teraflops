@@ -65,9 +65,8 @@ def cmd(node, command=None, private_key=None, extra_args=None):
 @contextlib.contextmanager
 def get_private_key(output_data, *nodes):
     might_need_ssh_key = nodes and any(node['provisionSSHKey'] for node in nodes) or not nodes
-    have_ssh_key = output_data['privateKey']
 
-    if might_need_ssh_key and have_ssh_key:
+    if might_need_ssh_key and 'privateKey' in output_data:
         with tempfile.TemporaryDirectory(prefix='teraflops', delete=True) as tempdir:
             private_key_path = os.path.join(tempdir, 'id_ed25519')
 
