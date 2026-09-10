@@ -272,6 +272,9 @@ let
         # slimmed down option set from colmena... thanks zhaofeng!
         ./deployment.nix
 
+        # `${name}-key` systemd units which watch for deployment keys being uploaded
+        ./keys.nix
+
         {
           _module.args = {
             inherit name;
